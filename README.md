@@ -1,1 +1,3 @@
 # MyAssetBundleManager
+
+一个下载AssetBundle的框架
