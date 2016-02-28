@@ -54,6 +54,8 @@ namespace AssetBundles
                 fs.Close();
             }
             File.WriteAllBytes(Path.Combine(outputPath, AssetBundleUtility.VersionFileName), Encoding.UTF8.GetBytes(sb.ToString()));
+
+            EditorUtility.DisplayDialog("Build AssetBundles", "Build Success!", "OK");
         }
 
         static string AssetPathToAssetBundleName(string assetPath)

@@ -14,6 +14,7 @@ namespace AssetBundles
         public static string LocalAssetBundlePath = Application.persistentDataPath + "/AssetBundles";
         public static string VersionFileName = "version";
 
+
         public static string GetMD5HashFromFile(string filePath)
         {
             try
