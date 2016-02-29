@@ -3,6 +3,7 @@
 using UnityEditor;
 #endif
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using System.IO;
 using System;
@@ -13,7 +14,81 @@ namespace AssetBundles
     {
         public static string LocalAssetBundlePath = Application.persistentDataPath + "/AssetBundles";
         public static string VersionFileName = "version";
+        public static bool ForceRedowload = false;
 
+        public static bool ResolveVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out string error)
+        {
+            try
+            {
+                if (assetBundleInfos == null)
+                {
+                    assetBundleInfos = new Dictionary<string, AssetBundleInfo>();
+                }
+                else
+                {
+                    assetBundleInfos.Clear();
+
+                }
+                string text = Encoding.UTF8.GetString(bytes);
+                string[] items = text.Split('\n');
+                foreach (var item in items)
+                {
+                    string[] infos = item.Split('\t');
+                    if (infos != null && infos.Length == 3)
+                    {
+                        AssetBundleInfo assetBundleInfo;
+                        assetBundleInfo.AssetBundleName = infos[0];
+                        assetBundleInfo.MD5 = infos[1];
+                        assetBundleInfo.Size = Convert.ToInt32(infos[2]);
+                        assetBundleInfos.Add(infos[0], assetBundleInfo);
+                    }
+                }
+                error = null;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = string.Format("Failed resolving version data: {0}", ex.ToString());
+                return false;
+            }
+        }
+
+        public static bool CheckLocalAssetBundles(out Dictionary<string, AssetBundleInfo> errorAssetBundleInfos)
+        {
+            errorAssetBundleInfos = new Dictionary<string, AssetBundleInfo>();
+            string versionFilePath = Path.Combine(LocalAssetBundlePath, VersionFileName);
+
+            if (!File.Exists(versionFilePath))
+            {
+                Debug.Log(string.Format("File dosen't exist: {0}", VersionFileName));
+                return false;
+            }
+
+            string error;
+            Dictionary<string, AssetBundleInfo> assetBundleInfos = new Dictionary<string, AssetBundleInfo>();
+            if (!ResolveVersionData(File.ReadAllBytes(versionFilePath), ref assetBundleInfos, out error))
+            {
+                Debug.Log("resolve local version file failed!");
+                return false;
+            }
+            foreach (var item in assetBundleInfos)
+            {
+                string assetBundleFilePath = Path.Combine(LocalAssetBundlePath, item.Value.AssetBundleName);
+                if (!File.Exists(assetBundleFilePath))
+                {
+                    errorAssetBundleInfos.Add(item.Key, item.Value);
+                }
+                else
+                {
+                    string MD5 = GetMD5HashFromFile(assetBundleFilePath);
+                    if (!MD5.Equals(item.Value.MD5))
+                    {
+                        errorAssetBundleInfos.Add(item.Key, item.Value);
+                    }
+                }
+            }
+            return assetBundleInfos.Count == 0;
+        }
 
         public static string GetMD5HashFromFile(string filePath)
         {
