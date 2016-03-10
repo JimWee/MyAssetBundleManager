@@ -26,6 +26,17 @@ namespace AssetBundles
         private static Dictionary<string, string> mDownloadingErrors = new Dictionary<string, string>();
         private static Dictionary<string, WWW> mDoneWWWs = new Dictionary<string, WWW>();
 
+        public static string GetAssetBundleServerUrl()
+        {
+            TextAsset urlFile = Resources.Load("AssetBundleServerURL") as TextAsset;
+            string url = (urlFile != null) ? urlFile.text.Trim() : null;
+            if (url == null || url.Length == 0)
+            {
+                Debug.LogError("Server URL could not be found.");
+            }
+            return url;
+        }
+
         public static void SetSourceAssetBundleURL(string absolutePath)
         {
             BaseDownloadingURL = absolutePath + AssetBundleUtility.GetPlatformName() + "/";
@@ -150,7 +161,13 @@ namespace AssetBundles
             {
                 try
                 {
-                    File.WriteAllBytes(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, fileName), www.bytes);
+                    string filePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, fileName);
+                    string dir = Path.GetDirectoryName(filePath);
+                    if (!Directory.Exists(dir))
+                    {
+                        Directory.CreateDirectory(dir);
+                    }
+                    File.WriteAllBytes(filePath, www.bytes);
                     error = null;
                     return true;
                 }
