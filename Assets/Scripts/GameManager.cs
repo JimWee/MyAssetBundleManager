@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
 using System.Collections;
 using System;
 using System.IO;
@@ -7,16 +8,23 @@ using AssetBundles;
 public class GameManager : MonoBehaviour
 {
 
+    public GameObject UIPopMsg;
+    public GameObject UIProgressBar;
+    public GameObject UIBottomMsg;
+
     // Use this for initialization
     IEnumerator Start()
     {
         string error = null;
+
+        AssetBundleUpdate.SetSourceAssetBundleURL(AssetBundleUpdate.GetAssetBundleServerUrl());
 
         //检查本地是否存在version文件
         string localVersinFilePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName);
         if (File.Exists(localVersinFilePath))
         {
             Debug.Log("检查更新");
+            SetBottomMsg("检查更新");
 
             //解析本地version文件
             byte[] localVersionBytes = File.ReadAllBytes(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName));
@@ -29,6 +37,7 @@ public class GameManager : MonoBehaviour
         else
         {
             Debug.Log("首次运行游戏，需下载初始游戏资源");
+            SetBottomMsg("首次运行游戏，需下载初始游戏资源");
         }
 
 
@@ -36,7 +45,7 @@ public class GameManager : MonoBehaviour
         yield return StartCoroutine(AssetBundleUpdate.DownloadFile(AssetBundleUtility.VersionFileName));
         if (AssetBundleUpdate.GetDownloadingError(AssetBundleUtility.VersionFileName, out error))
         {
-            Debug.Log(string.Format("下载资源失败：{0}", error));
+            Debug.Log(string.Format("下载资源失败：{0}", error));           
             yield break;
         }
 
@@ -63,9 +72,11 @@ public class GameManager : MonoBehaviour
         AssetBundleUpdate.FilterDownloadAssetBundleInfos();
         AssetBundleUpdate.GetDowloadInfo(out assetBundlesCount, out assetBundlesSize);
 
-        Debug.Log(string.Format("更新文件{0}个，大小{1}B", assetBundlesCount, assetBundlesSize / (1024 * 1024)));
+        Debug.Log(string.Format("更新文件{0}个，大小{1:F}MB", assetBundlesCount, assetBundlesSize / (1024 * 1024)));
 
         //下载AssetBundles
+        int downloadCount = 0;
+        float downloadSize = 0;
         foreach (var item in AssetBundleUpdate.DowloadAssetBundleInfos)
         {
             yield return StartCoroutine(AssetBundleUpdate.DownloadFile(item.Value.AssetBundleName));
@@ -79,6 +90,11 @@ public class GameManager : MonoBehaviour
                 Debug.Log(error);
                 yield break;
             }
+            downloadCount++;
+            downloadSize += item.Value.Size;
+
+            SetBottomMsg(string.Format("数量：{0}/{1}  大小：{2:F}KB/{3:F}KB", downloadCount, assetBundlesCount, downloadSize / 1024, assetBundlesSize / 1024));
+            UpdateProgress(downloadSize / assetBundlesSize);
         }
 
         //保存version文件
@@ -89,11 +105,27 @@ public class GameManager : MonoBehaviour
         }
 
         Debug.Log("更新完成");
+        SetBottomMsg("更新完成");
     }
 
     // Update is called once per frame
     void Update()
     {
 
+    }
+
+    void SetBottomMsg(string text)
+    {
+        Text textCpt = UIBottomMsg.GetComponent<Text>();
+        textCpt.text = text;
+    }
+
+    void UpdateProgress(float value)
+    {
+        Text textCpt = UIProgressBar.transform.Find("Text").GetComponent<Text>();
+        textCpt.text = string.Format("{0:F}%", value * 100);
+
+        Slider sliderCpt = UIProgressBar.GetComponent<Slider>();
+        sliderCpt.value = value;
     }
 }
