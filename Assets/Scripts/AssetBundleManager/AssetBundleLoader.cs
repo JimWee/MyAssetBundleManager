@@ -5,6 +5,8 @@ using System.IO;
 
 namespace AssetBundles
 {
+    public delegate void OnLoadAssetFinished(Object asset);
+
     public class LoadedAssetBundle
     {
         public AssetBundle mAssetBundle;
@@ -20,8 +22,7 @@ namespace AssetBundles
     public class AssetBundleLoader : MonoBehaviour
     {
 
-        public AssetBundleLoader Instance = null;
-        public Object LoadedAsset = null;
+        public static AssetBundleLoader Instance = null;
         AssetBundleManifest mAssetBundleManifest = null;
         Dictionary<string, LoadedAssetBundle> mLoadedAssetBundles = new Dictionary<string, LoadedAssetBundle>();
 
@@ -39,33 +40,76 @@ namespace AssetBundles
             AssetBundleRequest assetRequest = bundleRequest.assetBundle.LoadAssetAsync<AssetBundleManifest>("AssetBundleManifest");
             yield return assetRequest;
             mAssetBundleManifest = assetRequest.asset as AssetBundleManifest;
+            bundleRequest.assetBundle.Unload(false);
         }
 
-        public IEnumerator LoadAssetAsync(string assetPath)
+        public Object LoadAsset(string assetPath)
         {
-            if (!mLoadedAssetBundles.ContainsKey(assetPath))
+            assetPath = assetPath.ToLower();
+
+            //加载依赖AssetBundle
+            string[] dependencies = mAssetBundleManifest.GetAllDependencies(assetPath);
+            foreach (var item in dependencies)
             {
-                //加载依赖AssetBundle
-                string[] dependencies = mAssetBundleManifest.GetDirectDependencies(assetPath);
-                foreach (var item in dependencies)
+                LoadedAssetBundle loadedDependencyAssetBundle = null;
+                if (!mLoadedAssetBundles.TryGetValue(item, out loadedDependencyAssetBundle))
                 {
-                    LoadedAssetBundle loadedAssetBundle = null;
-                    if (!mLoadedAssetBundles.TryGetValue(item, out loadedAssetBundle))
-                    {
-                        yield return StartCoroutine(LoadAssetBundleAsync(item));
-                    }
-                    else
-                    {
-                        loadedAssetBundle.mReferencedCount++;
-
-                    }
+                    LoadAssetBundle(item);
                 }
+                else
+                {
+                    loadedDependencyAssetBundle.mReferencedCount++;
 
-                yield return StartCoroutine(LoadAssetBundleAsync(assetPath));
+                }
             }
 
-            string assetName = Path.GetFileName(assetPath);
+            LoadedAssetBundle loadedAssetBundle = null;
+            if (!mLoadedAssetBundles.TryGetValue(assetPath, out loadedAssetBundle))
+            {
+                LoadAssetBundle(assetPath);
+            }
+            else
+            {
+                loadedAssetBundle.mReferencedCount++;
+            }
+
             AssetBundle bundle = mLoadedAssetBundles[assetPath].mAssetBundle;
+            string assetName = Path.GetFileName(assetPath);
+            return bundle.LoadAsset(assetName);
+        }
+
+        public IEnumerator LoadAssetAsync(string assetPath, OnLoadAssetFinished onLoadAssetFinished)
+        {
+            assetPath = assetPath.ToLower();
+
+            //加载依赖AssetBundle
+            string[] dependencies = mAssetBundleManifest.GetAllDependencies(assetPath);
+            foreach (var item in dependencies)
+            {
+                LoadedAssetBundle loadedDependencyAssetBundle = null;
+                if (!mLoadedAssetBundles.TryGetValue(item, out loadedDependencyAssetBundle))
+                {
+                    yield return StartCoroutine(LoadAssetBundleAsync(item));
+                }
+                else
+                {
+                    loadedDependencyAssetBundle.mReferencedCount++;
+
+                }
+            }
+
+            LoadedAssetBundle loadedAssetBundle = null;
+            if (!mLoadedAssetBundles.TryGetValue(assetPath, out loadedAssetBundle))
+            {
+                yield return StartCoroutine(LoadAssetBundleAsync(assetPath));
+            }
+            else
+            {
+                loadedAssetBundle.mReferencedCount++;
+            }
+
+            AssetBundle bundle = mLoadedAssetBundles[assetPath].mAssetBundle;
+            string assetName = Path.GetFileName(assetPath);
             AssetBundleRequest assetRequest = bundle.LoadAssetAsync(assetName);
             yield return assetRequest;
             if (assetRequest.asset == null)
@@ -73,7 +117,19 @@ namespace AssetBundles
                 Debug.LogErrorFormat("Load Asset Failed: {0}", assetName);
                 yield break;
             }
-            LoadedAsset = assetRequest.asset;
+            onLoadAssetFinished(assetRequest.asset);
+        }
+
+        public void LoadAssetBundle(string assetBundleName)
+        {
+            AssetBundle asssetBundle = AssetBundle.LoadFromFile(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, assetBundleName));
+            if (asssetBundle == null)
+            {
+                Debug.LogErrorFormat("Load AssetBundle Failed: {0}", assetBundleName);
+                return;
+            }
+            LoadedAssetBundle loadedAssetBundle = new LoadedAssetBundle(asssetBundle);
+            mLoadedAssetBundles.Add(assetBundleName, loadedAssetBundle);
         }
 
         public IEnumerator LoadAssetBundleAsync(string assetBundleName)
@@ -87,6 +143,31 @@ namespace AssetBundles
             }
             LoadedAssetBundle loadedAssetBundle = new LoadedAssetBundle(bundleRequest.assetBundle);
             mLoadedAssetBundles.Add(assetBundleName, loadedAssetBundle);
+        }
+
+        public void UnloadAsset(string assetPath)
+        {
+            assetPath = assetPath.ToLower();
+            UnloadAssetBundle(assetPath);
+
+            foreach (var item in mAssetBundleManifest.GetAllDependencies(assetPath))
+            {
+                UnloadAssetBundle(item);
+            }
+        }
+
+        public void UnloadAssetBundle(string assetBundleName)
+        {
+            LoadedAssetBundle loadedAssetBundle = null;
+            if (mLoadedAssetBundles.TryGetValue(assetBundleName, out loadedAssetBundle))
+            {
+                loadedAssetBundle.mReferencedCount--;
+                if (loadedAssetBundle.mReferencedCount == 0)
+                {
+                    loadedAssetBundle.mAssetBundle.Unload(false);
+                    mLoadedAssetBundles.Remove(assetBundleName);
+                }
+            }
         }
     }
 }

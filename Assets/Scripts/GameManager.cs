@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
-using System;
 using System.IO;
 using AssetBundles;
 
@@ -11,6 +10,8 @@ public class GameManager : MonoBehaviour
     public GameObject UIPopMsg;
     public GameObject UIProgressBar;
     public GameObject UIBottomMsg;
+
+    GameObject mCube;
 
     // Use this for initialization
     IEnumerator Start()
@@ -106,6 +107,14 @@ public class GameManager : MonoBehaviour
 
         Debug.Log("更新完成");
         SetBottomMsg("更新完成");
+
+        //加载AssetBundleLoader
+        Debug.Log("初始化AssetBundleLoader");
+        SetBottomMsg("初始化资源");
+        gameObject.AddComponent<AssetBundleLoader>();
+        yield return StartCoroutine(AssetBundleLoader.Instance.Init());
+        Debug.Log("初始化AssetBundleLoader完成");
+        SetBottomMsg("初始化资源完成");
     }
 
     // Update is called once per frame
@@ -127,5 +136,26 @@ public class GameManager : MonoBehaviour
 
         Slider sliderCpt = UIProgressBar.GetComponent<Slider>();
         sliderCpt.value = value;
+    }
+
+    public void LoadCubeAsync()
+    {
+        StartCoroutine(AssetBundleLoader.Instance.LoadAssetAsync("prefab/mycube", delegate (Object asset) { mCube = Instantiate(asset) as GameObject; }));
+    }
+
+    public void LoadCube()
+    {
+        mCube = Instantiate(AssetBundleLoader.Instance.LoadAsset("prefab/mycube")) as GameObject;
+    }
+
+    public void DestroyCube()
+    {
+        Destroy(mCube);
+        Resources.UnloadUnusedAssets();
+    }
+
+    public void UnloadCube()
+    {
+        AssetBundleLoader.Instance.UnloadAsset("prefab/mycube");
     }
 }
