@@ -17,8 +17,9 @@ namespace AssetBundles
         static public void Build()
         {
             string outputPath = Path.Combine(AssetBundlesOutputPath, AssetBundleUtility.GetPlatformName());
-            if (!Directory.Exists(outputPath))
-                Directory.CreateDirectory(outputPath);
+            string outputPathRaw = Path.Combine(outputPath, AssetBundleUtility.GetPlatformName());
+            if (!Directory.Exists(outputPathRaw))
+                Directory.CreateDirectory(outputPathRaw);
 
             List<string> paths = new List<string>();
             paths.Add(AssetBundleUtility.GetPlatformName());
@@ -44,16 +45,16 @@ namespace AssetBundles
                 }
             }
 
-            BuildPipeline.BuildAssetBundles(outputPath, builds.ToArray(), BuildAssetBundleOptions.DisableWriteTypeTree | BuildAssetBundleOptions.ChunkBasedCompression, EditorUserBuildSettings.activeBuildTarget);
+            BuildPipeline.BuildAssetBundles(outputPathRaw, builds.ToArray(), BuildAssetBundleOptions.DisableWriteTypeTree | BuildAssetBundleOptions.ChunkBasedCompression, EditorUserBuildSettings.activeBuildTarget);
 
             StringBuilder sb = new StringBuilder();
             foreach (var path in paths)
             {
-                FileStream fs = new FileStream(Path.Combine(outputPath, path), FileMode.Open);
+                FileStream fs = new FileStream(Path.Combine(outputPathRaw, path), FileMode.Open);
                 sb.AppendFormat("{0}\t{1}\t{2}\n", path, AssetBundleUtility.GetMD5HashFromFileStream(fs), fs.Length);
                 fs.Close();
-            }
-            File.WriteAllBytes(Path.Combine(outputPath, AssetBundleUtility.VersionFileName), AssetBundleUtility.Encrypt(Encoding.UTF8.GetBytes(sb.ToString()), AssetBundleUtility.SecretKey));
+            }            
+            File.WriteAllBytes(Path.Combine(outputPathRaw, AssetBundleUtility.VersionFileName), Encoding.UTF8.GetBytes(sb.ToString()));            
 
             EditorUtility.DisplayDialog("Build AssetBundles", "Build Success!", "OK");
         }
@@ -61,7 +62,102 @@ namespace AssetBundles
         static string AssetPathToAssetBundleName(string assetPath)
         {     
             string assetbundleName = assetPath.Replace(AssetBundleResourcesPath + "/", "");
-            return assetbundleName.Substring(0, assetbundleName.LastIndexOf('.'));
+            return assetbundleName.Substring(0, assetbundleName.LastIndexOf('.'));            
+        }
+
+        [MenuItem("AssetBundles/Update Resources Files")]
+        static public void UpdateResourcesFiles()
+        {
+            string outputPath = Path.Combine(AssetBundlesOutputPath, AssetBundleUtility.GetPlatformName());
+            string outputPathRaw = Path.Combine(outputPath, AssetBundleUtility.GetPlatformName());
+
+            //获取资源目录下现有文件列表
+            DirectoryInfo dirInfo = new DirectoryInfo(outputPath);
+            FileInfo[] fileInfos = dirInfo.GetFiles();
+            Dictionary<string, FileInfo> files = new Dictionary<string, FileInfo>();
+            foreach (var item in fileInfos)
+            {
+                files.Add(item.Name, item);
+            }
+
+            //获取最新AssetBundle文件信息
+            string error = string.Empty;
+            Dictionary<string, AssetBundleInfo> assetBundleInfos = new Dictionary<string, AssetBundleInfo>();
+            byte[] bytes = File.ReadAllBytes(Path.Combine(outputPathRaw, AssetBundleUtility.VersionFileName));
+            File.WriteAllBytes(Path.Combine(outputPath, AssetBundleUtility.VersionFileName), AssetBundleUtility.Encrypt(bytes, AssetBundleUtility.SecretKey));
+            if (!AssetBundleUtility.ResolveDecryptedVersionData(bytes, ref assetBundleInfos, out error))
+            {
+                Debug.LogError("resolve version file failed: " + error);
+                return;
+            }
+
+            foreach (var item in assetBundleInfos)
+            {
+                if (files.ContainsKey(item.Value.MD5))//已有文件
+                {
+                    files.Remove(item.Key);
+                }
+                else//新文件
+                {
+                    File.Copy(Path.Combine(outputPathRaw, item.Key), Path.Combine(outputPath, item.Value.MD5), true);
+                }
+            }
+            //删除旧文件
+            foreach (var item in files)
+            {
+                File.Delete(item.Value.FullName);
+            }
+            EditorUtility.DisplayDialog("Update Resources Files", "Update Success!", "OK");
+        }
+
+        [MenuItem("AssetBundles/AssetBundle Folder/Open Local AssetBundle Folder")]
+        static void OpenLocalAssetBundleFolder()
+        {
+            string path = Path.GetFullPath(AssetBundleUtility.LocalAssetBundlePath);
+            if (Directory.Exists(path))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", "/root," + path);
+            }
+            else
+            {
+                EditorUtility.DisplayDialog("Open Local AssetBundle Folder", "Path don't exist: " + path, "OK");
+            }
+            
+        }
+
+        [MenuItem("AssetBundles/AssetBundle Folder/Open Output AssetBundle Folder")]
+        static void OpenOutputAssetBundleFolder()
+        {
+            string path = Path.GetFullPath(AssetBundlesOutputPath);
+            if (Directory.Exists(path))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", "/root," + path);
+            }
+            else
+            {
+                EditorUtility.DisplayDialog("Open Output AssetBundle Folder", "Path don't exist: " + path, "OK");
+            }
+            
+        }
+
+        [MenuItem("AssetBundles/AssetBundle Folder/Clear Local AssetBundle Folder")]
+        static void ClearLocalAssetBundleFolder()
+        {
+            if (Directory.Exists(AssetBundleUtility.LocalAssetBundlePath))
+            {
+                Directory.Delete(AssetBundleUtility.LocalAssetBundlePath, true);
+            }
+            EditorUtility.DisplayDialog("Clear Local AssetBundle Folder", "Clear Success", "OK");
+        }
+
+        [MenuItem("AssetBundles/AssetBundle Folder/Clear Output AssetBundle Folder")]
+        static void ClearOutputAssetBundleFolder()
+        {
+            if (Directory.Exists(AssetBundlesOutputPath))
+            {
+                Directory.Delete(AssetBundlesOutputPath, true);
+            }
+            EditorUtility.DisplayDialog("Clear Output AssetBundle Folder", "Clear Success", "OK");
         }
     }
 }

@@ -29,7 +29,7 @@ public class GameManager : MonoBehaviour
 
             //解析本地version文件
             byte[] localVersionBytes = File.ReadAllBytes(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName));
-            if (!AssetBundleUtility.ResolveVersionData(localVersionBytes, ref AssetBundleUpdate.LocalAssetBundleInfos, out error))
+            if (!AssetBundleUtility.ResolveEncryptedVersionData(localVersionBytes, ref AssetBundleUpdate.LocalAssetBundleInfos, out error))
             {
                 Debug.Log(error);
                 yield break;
@@ -54,7 +54,7 @@ public class GameManager : MonoBehaviour
         WWW wwwVersion;
         if (AssetBundleUpdate.GetDoneWWW(AssetBundleUtility.VersionFileName, out wwwVersion))
         {
-            if (!AssetBundleUtility.ResolveVersionData(wwwVersion.bytes, ref AssetBundleUpdate.ServerAssetBundleInfos, out error))
+            if (!AssetBundleUtility.ResolveEncryptedVersionData(wwwVersion.bytes, ref AssetBundleUpdate.ServerAssetBundleInfos, out error))
             {
                 Debug.Log(error);
                 yield break;

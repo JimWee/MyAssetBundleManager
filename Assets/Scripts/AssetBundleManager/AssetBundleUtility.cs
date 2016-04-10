@@ -18,7 +18,12 @@ namespace AssetBundles
         public static bool ForceRedowload = false;
         public static string SecretKey = "12345678";
 
-        public static bool ResolveVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out string error)
+        public static bool ResolveEncryptedVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out string error)
+        {
+            return ResolveDecryptedVersionData(Decrypt(bytes, SecretKey), ref assetBundleInfos, out error);
+        }
+
+        public static bool ResolveDecryptedVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out string error)
         {
             try
             {
@@ -31,7 +36,7 @@ namespace AssetBundles
                     assetBundleInfos.Clear();
 
                 }
-                string text = Encoding.UTF8.GetString(Decrypt(bytes, SecretKey));
+                string text = Encoding.UTF8.GetString(bytes);
                 string[] items = text.Split('\n');
                 foreach (var item in items)
                 {
@@ -68,7 +73,7 @@ namespace AssetBundles
 
             string error;
             Dictionary<string, AssetBundleInfo> assetBundleInfos = new Dictionary<string, AssetBundleInfo>();
-            if (!ResolveVersionData(File.ReadAllBytes(versionFilePath), ref assetBundleInfos, out error))
+            if (!ResolveEncryptedVersionData(File.ReadAllBytes(versionFilePath), ref assetBundleInfos, out error))
             {
                 Debug.Log("resolve local version file failed!");
                 return false;
