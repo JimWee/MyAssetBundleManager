@@ -53,7 +53,7 @@ namespace AssetBundles
                 sb.AppendFormat("{0}\t{1}\t{2}\n", path, AssetBundleUtility.GetMD5HashFromFileStream(fs), fs.Length);
                 fs.Close();
             }
-            File.WriteAllBytes(Path.Combine(outputPath, AssetBundleUtility.VersionFileName), Encoding.UTF8.GetBytes(sb.ToString()));
+            File.WriteAllBytes(Path.Combine(outputPath, AssetBundleUtility.VersionFileName), AssetBundleUtility.Encrypt(Encoding.UTF8.GetBytes(sb.ToString()), AssetBundleUtility.SecretKey));
 
             EditorUtility.DisplayDialog("Build AssetBundles", "Build Success!", "OK");
         }

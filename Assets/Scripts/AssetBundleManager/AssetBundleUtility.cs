@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.IO;
 using System;
+using System.Security.Cryptography;
 
 namespace AssetBundles
 {
@@ -15,6 +16,7 @@ namespace AssetBundles
         public static string LocalAssetBundlePath = Application.persistentDataPath + "/AssetBundles";
         public static string VersionFileName = "version";
         public static bool ForceRedowload = false;
+        public static string SecretKey = "12345678";
 
         public static bool ResolveVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out string error)
         {
@@ -29,7 +31,7 @@ namespace AssetBundles
                     assetBundleInfos.Clear();
 
                 }
-                string text = Encoding.UTF8.GetString(bytes);
+                string text = Encoding.UTF8.GetString(Decrypt(bytes, SecretKey));
                 string[] items = text.Split('\n');
                 foreach (var item in items)
                 {
@@ -95,7 +97,7 @@ namespace AssetBundles
             try
             {
                 FileStream file = new FileStream(filePath, FileMode.Open);
-                System.Security.Cryptography.MD5 md5 = new System.Security.Cryptography.MD5CryptoServiceProvider();
+                MD5 md5 = new MD5CryptoServiceProvider();
                 byte[] retVal = md5.ComputeHash(file);
                 file.Close();
 
@@ -116,7 +118,7 @@ namespace AssetBundles
         {
             try
             {
-                System.Security.Cryptography.MD5 md5 = new System.Security.Cryptography.MD5CryptoServiceProvider();
+                MD5 md5 = new MD5CryptoServiceProvider();
                 byte[] retVal = md5.ComputeHash(fs);
 
                 StringBuilder sb = new StringBuilder();
@@ -130,6 +132,30 @@ namespace AssetBundles
             {
                 throw new Exception("GetMD5HashFromFile() fail,error:" + ex.Message);
             }
+        }
+
+        public static byte[] Encrypt(byte[] bytes, string key)
+        {
+            DESCryptoServiceProvider des = new DESCryptoServiceProvider();
+            des.Key = Encoding.ASCII.GetBytes(key);
+            des.IV = Encoding.ASCII.GetBytes(key);
+            MemoryStream ms = new MemoryStream();
+            CryptoStream cs = new CryptoStream(ms, des.CreateEncryptor(), CryptoStreamMode.Write);
+            cs.Write(bytes, 0, bytes.Length);
+            cs.FlushFinalBlock();
+            return ms.ToArray();
+        }
+
+        public static byte[] Decrypt(byte[] bytes, string key)
+        {
+            DESCryptoServiceProvider des = new DESCryptoServiceProvider();
+            des.Key = Encoding.ASCII.GetBytes(key);
+            des.IV = Encoding.ASCII.GetBytes(key);
+            MemoryStream ms = new MemoryStream();
+            CryptoStream cs = new CryptoStream(ms, des.CreateDecryptor(), CryptoStreamMode.Write);
+            cs.Write(bytes, 0, bytes.Length);
+            cs.FlushFinalBlock();
+            return ms.ToArray();
         }
 
         public static string GetPlatformName()
