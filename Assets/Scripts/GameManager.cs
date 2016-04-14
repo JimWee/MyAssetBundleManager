@@ -80,13 +80,13 @@ public class GameManager : MonoBehaviour
         float downloadSize = 0;
         foreach (var item in AssetBundleUpdate.DowloadAssetBundleInfos)
         {
-            yield return StartCoroutine(AssetBundleUpdate.DownloadFile(item.Value.AssetBundleName));
-            if (AssetBundleUpdate.GetDownloadingError(item.Value.AssetBundleName, out error))
+            yield return StartCoroutine(AssetBundleUpdate.DownloadFile(item.Value.MD5));
+            if (AssetBundleUpdate.GetDownloadingError(item.Value.MD5, out error))
             {
                 Debug.Log(string.Format("下载资源失败：{0}", error));
                 yield break;
             }
-            if (!AssetBundleUpdate.SaveFile(item.Value.AssetBundleName, out error))
+            if (!AssetBundleUpdate.SaveFile(item.Value.MD5, out error))
             {
                 Debug.Log(error);
                 yield break;
@@ -107,6 +107,7 @@ public class GameManager : MonoBehaviour
 
         Debug.Log("更新完成");
         SetBottomMsg("更新完成");
+        AssetBundleUpdate.Clear();
 
         //加载AssetBundleLoader
         Debug.Log("初始化AssetBundleLoader");

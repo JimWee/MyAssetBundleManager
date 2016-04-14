@@ -25,17 +25,36 @@ namespace AssetBundles
         public static AssetBundleLoader Instance = null;
         AssetBundleManifest mAssetBundleManifest = null;
         Dictionary<string, LoadedAssetBundle> mLoadedAssetBundles = new Dictionary<string, LoadedAssetBundle>();
-
+        Dictionary<string, AssetBundleInfo> mAssetBundleInfos = new Dictionary<string, AssetBundleInfo>();
 
         void Awake()
         {
             Instance = this;
         }
 
+        public string AssetBundleName2FilePath(string assetBundleName)
+        {
+            AssetBundleInfo info;
+            if (mAssetBundleInfos.TryGetValue(assetBundleName, out info))
+            {
+                return Path.Combine(AssetBundleUtility.LocalAssetBundlePath, info.MD5);
+            }
+            return string.Empty; 
+        }
+
         public IEnumerator Init()
         {
+            //解析version文件
+            string error = "";
+            byte[] versionBytes = File.ReadAllBytes(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName));
+            if (!AssetBundleUtility.ResolveEncryptedVersionData(versionBytes, ref mAssetBundleInfos, out error))
+            {
+                Debug.LogErrorFormat("resolve version file failed: {0}", error);
+                yield break;
+            }
+
             //加载Manifest
-            AssetBundleCreateRequest bundleRequest = AssetBundle.LoadFromFileAsync(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.GetPlatformName()));
+            AssetBundleCreateRequest bundleRequest = AssetBundle.LoadFromFileAsync(AssetBundleName2FilePath(AssetBundleUtility.GetPlatformName()));
             yield return bundleRequest;
             AssetBundleRequest assetRequest = bundleRequest.assetBundle.LoadAssetAsync<AssetBundleManifest>("AssetBundleManifest");
             yield return assetRequest;
@@ -122,7 +141,7 @@ namespace AssetBundles
 
         public void LoadAssetBundle(string assetBundleName)
         {
-            AssetBundle asssetBundle = AssetBundle.LoadFromFile(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, assetBundleName));
+            AssetBundle asssetBundle = AssetBundle.LoadFromFile(AssetBundleName2FilePath(assetBundleName));
             if (asssetBundle == null)
             {
                 Debug.LogErrorFormat("Load AssetBundle Failed: {0}", assetBundleName);
@@ -134,7 +153,7 @@ namespace AssetBundles
 
         public IEnumerator LoadAssetBundleAsync(string assetBundleName)
         {
-            AssetBundleCreateRequest bundleRequest = AssetBundle.LoadFromFileAsync(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, assetBundleName));
+            AssetBundleCreateRequest bundleRequest = AssetBundle.LoadFromFileAsync(AssetBundleName2FilePath(assetBundleName));
             yield return bundleRequest;
             if (bundleRequest.assetBundle == null)
             {

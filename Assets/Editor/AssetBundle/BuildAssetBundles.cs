@@ -48,13 +48,16 @@ namespace AssetBundles
             BuildPipeline.BuildAssetBundles(outputPathRaw, builds.ToArray(), BuildAssetBundleOptions.DisableWriteTypeTree | BuildAssetBundleOptions.ChunkBasedCompression, EditorUserBuildSettings.activeBuildTarget);
 
             StringBuilder sb = new StringBuilder();
-            foreach (var path in paths)
+            for (int i = 0; i < paths.Count; i++)
             {
+                string path = paths[i];
                 FileStream fs = new FileStream(Path.Combine(outputPathRaw, path), FileMode.Open);
                 sb.AppendFormat("{0}\t{1}\t{2}\n", path, AssetBundleUtility.GetMD5HashFromFileStream(fs), fs.Length);
                 fs.Close();
+                EditorUtility.DisplayProgressBar("Compute MD5", string.Format("{0}/{1}  {2}", i + 1, paths.Count, path), (i + 1) / (float)paths.Count);
             }            
-            File.WriteAllBytes(Path.Combine(outputPathRaw, AssetBundleUtility.VersionFileName), Encoding.UTF8.GetBytes(sb.ToString()));            
+            File.WriteAllBytes(Path.Combine(outputPathRaw, AssetBundleUtility.VersionFileName), Encoding.UTF8.GetBytes(sb.ToString()));
+            EditorUtility.ClearProgressBar();
 
             EditorUtility.DisplayDialog("Build AssetBundles", "Build Success!", "OK");
         }
@@ -91,8 +94,10 @@ namespace AssetBundles
                 return;
             }
 
+            int index = 0;
             foreach (var item in assetBundleInfos)
             {
+                index++;
                 if (files.ContainsKey(item.Value.MD5))//已有文件
                 {
                     files.Remove(item.Key);
@@ -101,12 +106,17 @@ namespace AssetBundles
                 {
                     File.Copy(Path.Combine(outputPathRaw, item.Key), Path.Combine(outputPath, item.Value.MD5), true);
                 }
+                EditorUtility.DisplayProgressBar("Copy New File", string.Format("{0}/{1}  {2}", index, assetBundleInfos.Count, item.Value.MD5), index / (float)assetBundleInfos.Count);
             }
             //删除旧文件
+            index = 0;
             foreach (var item in files)
             {
+                index++;
                 File.Delete(item.Value.FullName);
+                EditorUtility.DisplayProgressBar("Delete Old File", string.Format("{0}/{1}  {2}", index, files.Count, item.Value.Name), index / (float)files.Count);
             }
+            EditorUtility.ClearProgressBar();
             EditorUtility.DisplayDialog("Update Resources Files", "Update Success!", "OK");
         }
 

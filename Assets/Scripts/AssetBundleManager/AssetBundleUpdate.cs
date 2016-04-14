@@ -17,8 +17,6 @@ namespace AssetBundles
     {
         
         public static string BaseDownloadingURL = "";
-        //public static AssetBundleManifest LocalAssetBundleManifest = null;
-        //public static AssetBundleManifest ServerAssetBundleManifest = null;
         public static Dictionary<string, AssetBundleInfo> LocalAssetBundleInfos = null;
         public static Dictionary<string, AssetBundleInfo> ServerAssetBundleInfos = null;
         public static Dictionary<string, AssetBundleInfo> DowloadAssetBundleInfos = null;
@@ -42,30 +40,9 @@ namespace AssetBundles
             BaseDownloadingURL = absolutePath + AssetBundleUtility.GetPlatformName() + "/";
         }
 
-        //public static IEnumerator LoadLocalAssetBundleManifestAsync()
-        //{
-        //    AssetBundleCreateRequest loadAssetBundleRequest = AssetBundle.LoadFromFileAsync(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.GetPlatformName()));
-        //    yield return loadAssetBundleRequest;
-        //    AssetBundle loadedAssetBundle = loadAssetBundleRequest.assetBundle;
-        //    AssetBundleRequest loadAssetRequest = loadedAssetBundle.LoadAssetAsync<AssetBundleManifest>("AssetBundleManifest");
-        //    yield return loadAssetRequest;
-        //    LocalAssetBundleManifest = loadAssetRequest.asset as AssetBundleManifest;
-        //}
-
-        //public static IEnumerator LoadServerAssetBundleManifestAsync()
-        //{
-        //    using (WWW www = new WWW(BaseDownloadingURL + AssetBundleUtility.GetPlatformName()))
-        //    {
-        //        yield return www;
-
-        //        if (!String.IsNullOrEmpty(www.error))
-        //        {
-        //            Debug.LogWarning(www.error);
-        //            yield break;
-        //        }
-        //    } 
-        //}
-
+        /// <summary>
+        /// 比较本地和服务器version文件，确定需要下载的文件（新文件和MD5改变的文件）
+        /// </summary>
         public static void SetDownloadAssetBundleInfos()
         {
             DowloadAssetBundleInfos = new Dictionary<string, AssetBundleInfo>();
@@ -76,22 +53,22 @@ namespace AssetBundles
             }
 
             if (LocalAssetBundleInfos == null)
-            {
-                DowloadAssetBundleInfos = new Dictionary<string, AssetBundleInfo>(ServerAssetBundleInfos);
+            {            
+                DowloadAssetBundleInfos = new Dictionary<string, AssetBundleInfo>(ServerAssetBundleInfos);//没有本地version文件，下载服务器version所有文件
                 return;
             }
         
             foreach (var item in ServerAssetBundleInfos)
             {
                 AssetBundleInfo assetBundleInfo;
-                if (LocalAssetBundleInfos.TryGetValue(item.Key, out assetBundleInfo))
+                if (LocalAssetBundleInfos.TryGetValue(item.Key, out assetBundleInfo))//已有文件
                 {
-                    if (!item.Value.MD5.Equals(assetBundleInfo.MD5))
+                    if (!item.Value.MD5.Equals(assetBundleInfo.MD5))//MD5不同，文件有改动
                     {
                         DowloadAssetBundleInfos.Add(item.Key, item.Value);
                     }
                 }
-                else
+                else//新文件
                 {
                     DowloadAssetBundleInfos.Add(item.Key, item.Value);
                 }
@@ -99,6 +76,9 @@ namespace AssetBundles
             return;
         }
 
+        /// <summary>
+        /// 过滤需下载文件，除去本地已有文件
+        /// </summary>
         public static void FilterDownloadAssetBundleInfos()
         {
             List<string> itemToRemove = new List<string>();
@@ -106,14 +86,10 @@ namespace AssetBundles
             {
                 foreach (var item in DowloadAssetBundleInfos)
                 {
-                    string path = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, item.Value.AssetBundleName);
+                    string path = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, item.Value.MD5);
                     if (File.Exists(path))
                     {
-                        string MD5 = AssetBundleUtility.GetMD5HashFromFile(path);
-                        if (MD5.Equals(item.Value.MD5))
-                        {
-                            itemToRemove.Add(item.Key);
-                        }
+                        itemToRemove.Add(item.Key);
                     }
                 }
             }
@@ -210,6 +186,15 @@ namespace AssetBundles
         public static bool RemoveDownloadingError(string fileName)
         {
             return mDownloadingErrors.Remove(fileName);
+        }
+
+        public static void Clear()
+        {
+            LocalAssetBundleInfos = null;
+            ServerAssetBundleInfos = null;
+            DowloadAssetBundleInfos = null;
+            mDownloadingErrors = null;
+            mDoneWWWs = null;
         }
 
     }
