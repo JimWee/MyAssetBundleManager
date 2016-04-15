@@ -1,0 +1,183 @@
+-------------------------------------------------------------------------------------------------------------------------------------
+LZ4 Library
+Copyright (c) 2011-2014, Yann Collet
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+  
+* Redistributions in binary form must reproduce the above copyright notice, this
+  list of conditions and the following disclaimer in the documentation and/or
+  other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-------------------------------------------------------------------------------------------------------------------------------------
+
+
+This is a plugin based on the LZ4 library released under the BSD license (see above).
+
+
+The scope of this library is to compress/decompress LZ4 archives and buffers on Android, iOS, WindowsPhone8.1, Windows10 Universal, Windows, OSX and Linux.
+
+The ios and OSX libraries are compiled as universal. That means that they will support 32 and 64 bit builds.
+The Windows and Linux libraries are compiled for x86 and x86_64 build modes.
+The Android lib is compiled for armeabi, armeabi-v7a, x86 and x86_64.
+The Windows Phone 8.1 lib is compiled for ARM and x86.
+THE WSA lib is compiled for ARM, x86 and x86_64.
+
+WSA SDK10 is supported with NetCore for Unity version 5.2 and higher.
+
+WP81 and WSA with SDK81 can be compiled with mscorlib. If you want NetCore support there you have to provide your own
+NetCore IO compatible functions.
+
+(If the demo on a windows10 phone does not show text, create a guiskin and attach a font to it. Then use this guiskin in your gui.)
+
+(ios: if you want to compile for watchOS,tvOS or simulator, extract in the Plugins/iOS folder and replace the desired plugin.)
+
+
+FEATURES:
+---------
+
+Fast LZ4 compression and decompression with a clean and simple interface. Very easy to use.
+
+
+- compress a file into a LZ4 file format.
+
+- decompress an LZ4 file.
+
+- compress a buffer into the LZ4 format.
+
+- decompress an LZ4 compressed buffer into a buffer.
+
+(The plugin provides a solution to store the uncompressed size of a compressed buffer in its footer.)
+
+- Linux, iOS, Android, MacOSX can treat  buffers as files. That means if you have a file in www.bytes  you can perform operations directly on the buffer.
+  For Android this is very useful since you can decompress from Streaming Assets without copying to  Persistent data path.
+
+!!! If you want to use only the lz4 plugin, please delete all the other plugins in their respective folders or use the single packages from the _plugin_packages folder!!!.
+
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+INSTRUCTIONS:
+-------------
+
+If you want to run a small example, compile and run the testScene.
+It will download a small tif file and it will perform all the functions the lib provides.
+
+See the LZ4.cs file for more comments and error codes.
+
+In your project include in the Plugins folder the plugins you want to use and the LZ4.cs file and call the appropriate functions
+as described below and shown in the demo scene.
+
+
+THE FUNCTIONS:
+--------------
+
+
+float compress(string inFile, string outFile, int level, float[] progress);
+
+Compress a file to LZ4.
+
+Full paths to the files should be provide.
+level: level of compression (1 - 9).
+returns: rate of compression.
+progress: provide a single item float array to get the progress of the compression in real time. (only when called from a thread/task)
+	
+-------------------------------------------------------------------------------------------------------------------------------------
+
+int decompress(string inFile, string outFile, int[] bytes, byte[] FileBuffer = null);
+
+Decompress an LZ4 file.
+
+Full paths to the files should be provided.
+returns: 0 on success.
+bytes: provide a single item integer array to get the bytes currently decompressed in real time.  (only when called from a thread/task)
+FileBuffer: A buffer that holds an LZ4 file. When assigned the function will decompress from this buffer and will ignore the filePath. (Linux, iOS, Android, MacOSX)
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+bool compressBuffer(byte[] inBuffer, ref byte[] outBuffer, bool includeSize = true);
+
+Compress a byte buffer in LZ4 format.
+
+inBuffer: the uncompressed buffer.
+outBuffer: a referenced buffer that will be resized to fit the lz4 compressed data.
+includeSize: include the uncompressed size of the buffer in the resulted compressed one because lz4 does not include this.
+returns true on success
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+byte[] compressBuffer(byte[] inBuffer, bool includeSize = true);
+
+Compress a byte buffer in LZ4 format ad return a new buffer compressed.
+
+inBuffer: the uncompressed buffer.
+includeSize: include the uncompressed size of the buffer in the resulted compressed one because lz4 does not include this.
+returns: a new buffer with the compressed data.
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+bool decompressBuffer(byte[] inBuffer, ref byte[] outBuffer, bool useFooter = true, int customLength = 0);
+
+Decompress an lz4 compressed buffer to a referenced buffer.
+
+inBuffer: the lz4 compressed buffer
+outBuffer: a referenced buffer that will be resized to store the uncompressed data.
+useFooter: if the input Buffer has the uncompressed size info.
+customLength: provide the uncompressed size of the compressed buffer. Not needed if the useFooter is used!
+returns true on success
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+byte[] decompressBuffer(byte[] inBuffer, bool useFooter = true, int customLength = 0);
+
+Decompress an lz4 compressed buffer to a new buffer.
+
+inBuffer: the lz4 compressed buffer
+useFooter: if the input Buffer has the uncompressed size info.
+customLength: provide the uncompressed size of the compressed buffer. Not needed if the useFooter is used!
+returns: a new buffer with the uncompressed data.
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+int decompressBufferFixed(byte[] inBuffer, ref byte[] outBuffer, bool safe = true, bool useFooter = true, int customLength = 0);
+
+Decompress an lz4 compressed buffer to a referenced fixed size buffer.
+
+inBuffer: the lz4 compressed buffer
+outBuffer: a referenced fixed size buffer where the data will get decompressed
+usefooter: if the input Buffer has the uncompressed size info.
+customLength: provide the uncompressed size of the compressed buffer. Not needed if the usefooter is used!
+returns uncompressedSize
+
+This function is useful if you want to avoid memory allocations caused by new buffers or buffer resizing.
+
+-------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+SUPPORT:
+--------
+
+For any questions, problems and suggestions please use this email address: elias_t@yahoo.com
+
+forum: http://forum.unity3d.com/threads/7zip-lzma-and-zip-native-multiplatform-plugins.211273/
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
