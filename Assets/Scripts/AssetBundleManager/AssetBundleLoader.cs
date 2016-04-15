@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.SceneManagement;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -64,10 +65,49 @@ namespace AssetBundles
 
         public Object LoadAsset(string assetPath)
         {
-            assetPath = assetPath.ToLower();
+            AssetBundle bundle = LoadAssetBundleWithDependencies(assetPath);
+            string assetName = Path.GetFileName(assetPath);
+            return bundle.LoadAsset(assetName);
+        }
+
+        public IEnumerator LoadAssetAsync(string assetPath, OnLoadAssetFinished onLoadAssetFinished)
+        {
+            yield return StartCoroutine(LoadAssetBundleWithDependenciesAsync(assetPath));
+            AssetBundle bundle = mLoadedAssetBundles[assetPath].mAssetBundle;
+            string assetName = Path.GetFileName(assetPath);
+            AssetBundleRequest assetRequest = bundle.LoadAssetAsync(assetName);
+            yield return assetRequest;
+            if (assetRequest.asset == null)
+            {
+                Debug.LogErrorFormat("Load Asset Failed: {0}", assetName);
+                yield break;
+            }
+            onLoadAssetFinished(assetRequest.asset);
+        }
+
+        /// <summary>
+        /// 场景名字大小写敏感，坑~
+        /// </summary>
+        /// <param name="scenePath"></param>
+        /// <param name="mode"></param>
+        public void LoadScene(string scenePath, LoadSceneMode mode = LoadSceneMode.Single)
+        {
+            LoadAssetBundleWithDependencies(scenePath);
+            SceneManager.LoadScene(Path.GetFileName(scenePath), mode);
+        }
+
+        public IEnumerator LoadSceneAsync(string scenePath, LoadSceneMode mode = LoadSceneMode.Single)
+        {
+            yield return StartCoroutine(LoadAssetBundleWithDependenciesAsync(scenePath));
+            SceneManager.LoadSceneAsync(Path.GetFileName(scenePath), mode);
+        }
+
+        public AssetBundle LoadAssetBundleWithDependencies(string assetBundleName)
+        {
+            assetBundleName = assetBundleName.ToLower();
 
             //加载依赖AssetBundle
-            string[] dependencies = mAssetBundleManifest.GetAllDependencies(assetPath);
+            string[] dependencies = mAssetBundleManifest.GetAllDependencies(assetBundleName);
             foreach (var item in dependencies)
             {
                 LoadedAssetBundle loadedDependencyAssetBundle = null;
@@ -83,26 +123,38 @@ namespace AssetBundles
             }
 
             LoadedAssetBundle loadedAssetBundle = null;
-            if (!mLoadedAssetBundles.TryGetValue(assetPath, out loadedAssetBundle))
+            if (!mLoadedAssetBundles.TryGetValue(assetBundleName, out loadedAssetBundle))
             {
-                LoadAssetBundle(assetPath);
+                LoadAssetBundle(assetBundleName);
             }
             else
             {
                 loadedAssetBundle.mReferencedCount++;
             }
 
-            AssetBundle bundle = mLoadedAssetBundles[assetPath].mAssetBundle;
-            string assetName = Path.GetFileName(assetPath);
-            return bundle.LoadAsset(assetName);
+            return mLoadedAssetBundles[assetBundleName].mAssetBundle;
         }
 
-        public IEnumerator LoadAssetAsync(string assetPath, OnLoadAssetFinished onLoadAssetFinished)
+        public void LoadAssetBundle(string assetBundleName)
         {
-            assetPath = assetPath.ToLower();
+            assetBundleName = assetBundleName.ToLower();
+
+            AssetBundle asssetBundle = AssetBundle.LoadFromFile(AssetBundleName2FilePath(assetBundleName));
+            if (asssetBundle == null)
+            {
+                Debug.LogErrorFormat("Load AssetBundle Failed: {0}", assetBundleName);
+                return;
+            }
+            LoadedAssetBundle loadedAssetBundle = new LoadedAssetBundle(asssetBundle);
+            mLoadedAssetBundles.Add(assetBundleName, loadedAssetBundle);
+        }
+
+        public IEnumerator LoadAssetBundleWithDependenciesAsync(string assetBundleName)
+        {
+            assetBundleName = assetBundleName.ToLower();
 
             //加载依赖AssetBundle
-            string[] dependencies = mAssetBundleManifest.GetAllDependencies(assetPath);
+            string[] dependencies = mAssetBundleManifest.GetAllDependencies(assetBundleName);
             foreach (var item in dependencies)
             {
                 LoadedAssetBundle loadedDependencyAssetBundle = null;
@@ -118,41 +170,20 @@ namespace AssetBundles
             }
 
             LoadedAssetBundle loadedAssetBundle = null;
-            if (!mLoadedAssetBundles.TryGetValue(assetPath, out loadedAssetBundle))
+            if (!mLoadedAssetBundles.TryGetValue(assetBundleName, out loadedAssetBundle))
             {
-                yield return StartCoroutine(LoadAssetBundleAsync(assetPath));
+                yield return StartCoroutine(LoadAssetBundleAsync(assetBundleName));
             }
             else
             {
                 loadedAssetBundle.mReferencedCount++;
             }
-
-            AssetBundle bundle = mLoadedAssetBundles[assetPath].mAssetBundle;
-            string assetName = Path.GetFileName(assetPath);
-            AssetBundleRequest assetRequest = bundle.LoadAssetAsync(assetName);
-            yield return assetRequest;
-            if (assetRequest.asset == null)
-            {
-                Debug.LogErrorFormat("Load Asset Failed: {0}", assetName);
-                yield break;
-            }
-            onLoadAssetFinished(assetRequest.asset);
-        }
-
-        public void LoadAssetBundle(string assetBundleName)
-        {
-            AssetBundle asssetBundle = AssetBundle.LoadFromFile(AssetBundleName2FilePath(assetBundleName));
-            if (asssetBundle == null)
-            {
-                Debug.LogErrorFormat("Load AssetBundle Failed: {0}", assetBundleName);
-                return;
-            }
-            LoadedAssetBundle loadedAssetBundle = new LoadedAssetBundle(asssetBundle);
-            mLoadedAssetBundles.Add(assetBundleName, loadedAssetBundle);
         }
 
         public IEnumerator LoadAssetBundleAsync(string assetBundleName)
         {
+            assetBundleName = assetBundleName.ToLower();
+
             AssetBundleCreateRequest bundleRequest = AssetBundle.LoadFromFileAsync(AssetBundleName2FilePath(assetBundleName));
             yield return bundleRequest;
             if (bundleRequest.assetBundle == null)
@@ -164,9 +195,15 @@ namespace AssetBundles
             mLoadedAssetBundles.Add(assetBundleName, loadedAssetBundle);
         }
 
+        public void UnloadScene(string scenePath)
+        {
+            UnloadAsset(scenePath);
+        }
+
         public void UnloadAsset(string assetPath)
         {
             assetPath = assetPath.ToLower();
+
             UnloadAssetBundle(assetPath);
 
             foreach (var item in mAssetBundleManifest.GetAllDependencies(assetPath))
@@ -177,6 +214,8 @@ namespace AssetBundles
 
         public void UnloadAssetBundle(string assetBundleName)
         {
+            assetBundleName = assetBundleName.ToLower();
+
             LoadedAssetBundle loadedAssetBundle = null;
             if (mLoadedAssetBundles.TryGetValue(assetBundleName, out loadedAssetBundle))
             {

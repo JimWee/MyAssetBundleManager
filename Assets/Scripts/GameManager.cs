@@ -159,4 +159,14 @@ public class GameManager : MonoBehaviour
     {
         AssetBundleLoader.Instance.UnloadAsset("prefab/mycube");
     }
+
+    public void LoadScene()
+    {
+        AssetBundleLoader.Instance.LoadScene("scene/Scene2");
+    }
+
+    public void LoadSceneAsync()
+    {
+        StartCoroutine(AssetBundleLoader.Instance.LoadSceneAsync("scene/Scene2"));
+    }
 }
