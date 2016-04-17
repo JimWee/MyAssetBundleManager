@@ -1,0 +1,185 @@
+-------------------------------------------------------------------------------------------------------------------------------------
+FastLZ - lightning-fast lossless compression library
+Copyright (C) 2007 Ariya Hidayat (ariya@kde.org)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+-------------------------------------------------------------------------------------------------------------------------------------
+
+
+This is a plugin based on the FastLZ library released under the MIT license (see above).
+
+
+The scope of this library is to compress/decompress FastLZ archives and buffers on Android, iOS, WindowsPhone8.1, Windows10 Universal, Windows, OSX and Linux.
+
+The ios and OSX libraries are compiled as universal. That means that they will support 32 and 64 bit builds.
+The Windows and Linux libraries are compiled for x86 and x86_64 build modes.
+The Android lib is compiled for armeabi, armeabi-v7a, x86 and x86_64.
+The Windows Phone 8.1 lib is compiled for ARM and x86.
+THE WSA lib is compiled for ARM, x86 and x86_64.
+
+WSA SDK10 is supported with NetCore for Unity version 5.2 and higher.
+
+WP81 and WSA with SDK81 can be compiled with mscorlib. If you want NetCore support there you have to provide your own
+NetCore IO compatible functions.
+
+(If the demo on a windows10 phone does not show text, create a guiskin and attach a font to it. Then use this guiskin in your gui.)
+
+(ios: if you want to compile for watchOS,tvOS or simulator, extract in the Plugins/iOS folder and replace the desired plugin.)
+
+
+FEATURES:
+---------
+
+Fast FastLZ compression and decompression with a clean and simple interface. Very easy to use.
+
+
+- compress a file into a FastLZ file format.
+
+- decompress a FastLZ file.
+
+- compress a buffer into the FastLZ format.
+
+- decompress a FastLZ compressed buffer into a buffer.
+
+(The plugin provides a solution to store the uncompressed size of a compressed buffer in its footer.)
+
+- Linux, iOS, Android, MacOSX can treat  buffers as files. That means if you have a file in www.bytes  you can perform operations directly on the buffer.
+  For Android this is very useful since you can decompress from Streaming Assets without copying to  Persistent data path.
+
+
+!!! If you want to use only the FastLZ plugin, please delete all the other plugins in their respective folders or use the single packages from the _plugin_packages folder!!!.
+
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+INSTRUCTIONS:
+-------------
+
+If you want to run a small example, compile and run the testScene.
+It will download a small tif file and it will perform all the functions the lib provides.
+
+See the fLZ.cs file for more comments and error codes.
+
+In your project include in the Plugins folder the plugins you want to use and the fLZ.cs file and call the appropriate functions
+as described below and shown in the demo scene.
+
+
+THE FUNCTIONS:
+--------------
+
+
+int compressFile(string inFile, string outFile, int level, bool overwrite, ulong[] progress);
+
+Compress a file to fLZ.
+
+Full paths to the files should be provided.
+level:    level of compression (1 = faster/bigger, 2 = slower/smaller).
+returns:  size of resulting archive in bytes
+progress: provide a single item ulong array to get the progress of the compression in real time. (only when called from a thread/task)
+	
+-------------------------------------------------------------------------------------------------------------------------------------
+
+int decompressFile(string inFile, string outFile, bool overwrite, ulong[] progress, byte[] FileBuffer = null);
+
+Decompress an fLZ file.
+
+Full paths to the files should be provided.
+returns: 1 on success.
+progress: provide a single item ulong array to get the progress of the decompression in real time. (only when called from a thread/task)
+FileBuffer: A buffer that holds an flz file. When assigned the function will decompress from this buffer and will ignore the filePath. (Linux, iOS, Android, MacOSX)
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+bool bool compressBuffer(byte[] inBuffer, ref byte[] outBuffer, int level, bool includeSize = true);
+
+Compress a byte buffer in fLZ format.
+
+inBuffer:     the uncompressed buffer.
+outBuffer:    a referenced buffer that will be resized to fit the fLZ compressed data.
+includeSize:  include the uncompressed size of the buffer in the resulted compressed one because fLZ does not include this.
+level:        level of compression (1 = faster/bigger, 2 = slower/smaller).
+returns true on success
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+byte[] compressBuffer(byte[] inBuffer, int level, bool includeSize = true);
+
+Compress a byte buffer in fLZ format.
+
+inBuffer:     the uncompressed buffer.
+outBuffer:    a referenced buffer that will be resized to fit the fLZ compressed data.
+includeSize:  include the uncompressed size of the buffer in the resulted compressed one because fLZ does not include this.
+level:        level of compression (1 = faster/bigger, 2 = slower/smaller).
+returns: a new buffer with the compressed data.
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+bool bool decompressBuffer(byte[] inBuffer, ref byte[] outBuffer, bool useFooter = true, int customLength = 0);
+
+Decompress an fLZ compressed buffer to a referenced buffer.
+
+inBuffer: the fLZ compressed buffer
+outBuffer: a referenced buffer that will be resized to store the uncompressed data.
+useFooter: if the input Buffer has the uncompressed size info.
+customLength: provide the uncompressed size of the compressed buffer. Not needed if the useFooter is used!
+returns true on success
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+byte[] decompressBuffer(byte[] inBuffer, bool useFooter = true, int customLength = 0);
+
+Decompress an fLZ compressed buffer to a new buffer.
+
+inBuffer: the fLZ compressed buffer
+useFooter: if the input Buffer has the uncompressed size info.
+customLength: provide the uncompressed size of the compressed buffer. Not needed if the useFooter is used!
+returns: a new buffer with the uncompressed data.
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+int decompressBufferFixed(byte[] inBuffer, ref byte[] outBuffer, bool safe = true, bool useFooter = true, int customLength = 0);
+
+Decompress an flz compressed buffer to a referenced fixed size buffer.
+
+inBuffer: the flz compressed buffer
+outBuffer: a referenced fixed size buffer where the data will get decompressed
+useFooter: if the input Buffer has the uncompressed size info.
+customLength: provide the uncompressed size of the compressed buffer. Not needed if the useFooter is used!
+returns uncompressedSize
+
+This function is useful if you want to avoid memory allocations caused by new buffers or buffer resizing.
+
+-------------------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+SUPPORT:
+--------
+
+For any questions, problems and suggestions please use this email address: elias_t@yahoo.com
+
+forum: http://forum.unity3d.com/threads/7zip-lzma-and-zip-native-multiplatform-plugins.211273/
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+
