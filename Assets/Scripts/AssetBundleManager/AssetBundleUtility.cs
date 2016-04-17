@@ -13,7 +13,7 @@ namespace AssetBundles
 {
     public class AssetBundleUtility
     {
-        public static string LocalAssetBundlePath = Application.persistentDataPath + "/AssetBundles";
+        public static string LocalAssetBundlePath = Application.persistentDataPath + "/Resources";
         public static string VersionFileName = "version";
         public static bool ForceRedowload = false;
         public static string SecretKey = "12345678";

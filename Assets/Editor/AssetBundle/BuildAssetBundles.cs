@@ -126,7 +126,7 @@ namespace AssetBundles
             string path = Path.GetFullPath(AssetBundleUtility.LocalAssetBundlePath);
             if (Directory.Exists(path))
             {
-                System.Diagnostics.Process.Start("explorer.exe", "/root," + path);
+                System.Diagnostics.Process.Start("explorer.exe", "/select," + path);
             }
             else
             {
@@ -141,7 +141,7 @@ namespace AssetBundles
             string path = Path.GetFullPath(AssetBundlesOutputPath);
             if (Directory.Exists(path))
             {
-                System.Diagnostics.Process.Start("explorer.exe", "/root," + path);
+                System.Diagnostics.Process.Start("explorer.exe", "/select," + path);
             }
             else
             {
