@@ -13,7 +13,7 @@ namespace AssetBundles
 {
     public class AssetBundleUtility
     {
-        public static string LocalAssetBundlePath = Application.persistentDataPath + "/Resources";
+        public static string LocalAssetBundlePath = Application.persistentDataPath + "/Patches";
         public static string VersionFileName = "version";
         public static bool ForceRedowload = false;
         public static string SecretKey = "12345678";
@@ -147,7 +147,7 @@ namespace AssetBundles
             MemoryStream ms = new MemoryStream();
             CryptoStream cs = new CryptoStream(ms, des.CreateEncryptor(), CryptoStreamMode.Write);
             cs.Write(bytes, 0, bytes.Length);
-            cs.FlushFinalBlock();
+            cs.Flush();
             return ms.ToArray();
         }
 
@@ -159,7 +159,7 @@ namespace AssetBundles
             MemoryStream ms = new MemoryStream();
             CryptoStream cs = new CryptoStream(ms, des.CreateDecryptor(), CryptoStreamMode.Write);
             cs.Write(bytes, 0, bytes.Length);
-            cs.FlushFinalBlock();
+            cs.Flush();
             return ms.ToArray();
         }
 

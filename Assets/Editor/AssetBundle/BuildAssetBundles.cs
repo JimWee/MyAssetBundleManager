@@ -12,15 +12,18 @@ namespace AssetBundles
     {
         public const string AssetBundleResourcesPath = "Assets/AssetBundleResources";
         public const string AssetBundlesOutputPath = "AssetBundles";
+        public const string PatchesOutputPath = "Patches";
+        public const string ChangeLogFileName = "ChangeLog.txt";
 
         [MenuItem("AssetBundles/Build AssetBundles")]
         static public void Build()
         {
             string outputPath = Path.Combine(AssetBundlesOutputPath, AssetBundleUtility.GetPlatformName());
-            string outputPathRaw = Path.Combine(outputPath, AssetBundleUtility.GetPlatformName());
-            if (!Directory.Exists(outputPathRaw))
-                Directory.CreateDirectory(outputPathRaw);
-
+            if (!Directory.Exists(outputPath))
+            {
+                Directory.CreateDirectory(outputPath);
+            }
+                
             List<string> paths = new List<string>();
             paths.Add(AssetBundleUtility.GetPlatformName());
 
@@ -45,18 +48,18 @@ namespace AssetBundles
                 }
             }
 
-            BuildPipeline.BuildAssetBundles(outputPathRaw, builds.ToArray(), BuildAssetBundleOptions.DisableWriteTypeTree | BuildAssetBundleOptions.ChunkBasedCompression, EditorUserBuildSettings.activeBuildTarget);
+            BuildPipeline.BuildAssetBundles(outputPath, builds.ToArray(), BuildAssetBundleOptions.DisableWriteTypeTree | BuildAssetBundleOptions.ChunkBasedCompression, EditorUserBuildSettings.activeBuildTarget);
 
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < paths.Count; i++)
             {
                 string path = paths[i];
-                FileStream fs = new FileStream(Path.Combine(outputPathRaw, path), FileMode.Open);
+                FileStream fs = new FileStream(Path.Combine(outputPath, path), FileMode.Open);
                 sb.AppendFormat("{0}\t{1}\t{2}\n", path, AssetBundleUtility.GetMD5HashFromFileStream(fs), fs.Length);
                 fs.Close();
                 EditorUtility.DisplayProgressBar("Compute MD5", string.Format("{0}/{1}  {2}", i + 1, paths.Count, path), (i + 1) / (float)paths.Count);
             }            
-            File.WriteAllBytes(Path.Combine(outputPathRaw, AssetBundleUtility.VersionFileName), Encoding.UTF8.GetBytes(sb.ToString()));
+            File.WriteAllBytes(Path.Combine(outputPath, AssetBundleUtility.VersionFileName), Encoding.UTF8.GetBytes(sb.ToString()));
             EditorUtility.ClearProgressBar();
 
             EditorUtility.DisplayDialog("Build AssetBundles", "Build Success!", "OK");
@@ -71,11 +74,16 @@ namespace AssetBundles
         [MenuItem("AssetBundles/Update Resources Files")]
         static public void UpdateResourcesFiles()
         {
-            string outputPath = Path.Combine(AssetBundlesOutputPath, AssetBundleUtility.GetPlatformName());
-            string outputPathRaw = Path.Combine(outputPath, AssetBundleUtility.GetPlatformName());
+            string patchesOutputPath = Path.Combine(PatchesOutputPath, AssetBundleUtility.GetPlatformName());
+            string assetBundlesOutputPath = Path.Combine(AssetBundlesOutputPath, AssetBundleUtility.GetPlatformName());
+
+            if (!Directory.Exists(patchesOutputPath))
+            {
+                Directory.CreateDirectory(patchesOutputPath);
+            }
 
             //获取资源目录下现有文件列表
-            DirectoryInfo dirInfo = new DirectoryInfo(outputPath);
+            DirectoryInfo dirInfo = new DirectoryInfo(patchesOutputPath);
             FileInfo[] fileInfos = dirInfo.GetFiles();
             Dictionary<string, FileInfo> files = new Dictionary<string, FileInfo>();
             foreach (var item in fileInfos)
@@ -86,13 +94,16 @@ namespace AssetBundles
             //获取最新AssetBundle文件信息
             string error = string.Empty;
             Dictionary<string, AssetBundleInfo> assetBundleInfos = new Dictionary<string, AssetBundleInfo>();
-            byte[] bytes = File.ReadAllBytes(Path.Combine(outputPathRaw, AssetBundleUtility.VersionFileName));
-            File.WriteAllBytes(Path.Combine(outputPath, AssetBundleUtility.VersionFileName), AssetBundleUtility.Encrypt(bytes, AssetBundleUtility.SecretKey));
+            byte[] bytes = File.ReadAllBytes(Path.Combine(assetBundlesOutputPath, AssetBundleUtility.VersionFileName));            
             if (!AssetBundleUtility.ResolveDecryptedVersionData(bytes, ref assetBundleInfos, out error))
             {
                 Debug.LogError("resolve version file failed: " + error);
                 return;
             }
+
+            StringBuilder keepFilesSB = new StringBuilder("Keep Files:\n");
+            StringBuilder addFilesSB = new StringBuilder("Add Files:\n");
+            StringBuilder deleteFilesSB = new StringBuilder("Delet Files:\n");
 
             int index = 0;
             foreach (var item in assetBundleInfos)
@@ -100,11 +111,13 @@ namespace AssetBundles
                 index++;
                 if (files.ContainsKey(item.Value.MD5))//已有文件
                 {
-                    files.Remove(item.Key);
+                    files.Remove(item.Value.MD5);
+                    keepFilesSB.AppendFormat("{0}\t{1}\n", item.Key, item.Value.MD5);
                 }
                 else//新文件
                 {
-                    File.Copy(Path.Combine(outputPathRaw, item.Key), Path.Combine(outputPath, item.Value.MD5), true);
+                    File.Copy(Path.Combine(assetBundlesOutputPath, item.Key), Path.Combine(patchesOutputPath, item.Value.MD5), true);
+                    addFilesSB.AppendFormat("{0}\t{1}\n", item.Key, item.Value.MD5);
                 }
                 EditorUtility.DisplayProgressBar("Copy New File", string.Format("{0}/{1}  {2}", index, assetBundleInfos.Count, item.Value.MD5), index / (float)assetBundleInfos.Count);
             }
@@ -114,14 +127,22 @@ namespace AssetBundles
             {
                 index++;
                 File.Delete(item.Value.FullName);
+                deleteFilesSB.AppendLine(item.Key);
                 EditorUtility.DisplayProgressBar("Delete Old File", string.Format("{0}/{1}  {2}", index, files.Count, item.Value.Name), index / (float)files.Count);
             }
+
+            //写入version文件
+            File.WriteAllBytes(Path.Combine(patchesOutputPath, AssetBundleUtility.VersionFileName), AssetBundleUtility.Encrypt(bytes, AssetBundleUtility.SecretKey));
+
+            //changelog
+            File.WriteAllBytes(Path.Combine(patchesOutputPath, ChangeLogFileName), Encoding.UTF8.GetBytes(keepFilesSB.ToString() + addFilesSB.ToString() + deleteFilesSB.ToString()));
+
             EditorUtility.ClearProgressBar();
             EditorUtility.DisplayDialog("Update Resources Files", "Update Success!", "OK");
         }
 
-        [MenuItem("AssetBundles/AssetBundle Folder/Open Local AssetBundle Folder")]
-        static void OpenLocalAssetBundleFolder()
+        [MenuItem("AssetBundles/AssetBundle Folder/Open Local Patches Folder")]
+        static void OpenLocalPatchesFolder()
         {
             string path = Path.GetFullPath(AssetBundleUtility.LocalAssetBundlePath);
             if (Directory.Exists(path))
@@ -150,8 +171,23 @@ namespace AssetBundles
             
         }
 
-        [MenuItem("AssetBundles/AssetBundle Folder/Clear Local AssetBundle Folder")]
-        static void ClearLocalAssetBundleFolder()
+        [MenuItem("AssetBundles/AssetBundle Folder/Open Output Patches Folder")]
+        static void OpenOutputPatchesFolder()
+        {
+            string path = Path.GetFullPath(PatchesOutputPath);
+            if (Directory.Exists(path))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", "/select," + path);
+            }
+            else
+            {
+                EditorUtility.DisplayDialog("Open Output Patches Folder", "Path don't exist: " + path, "OK");
+            }
+
+        }
+
+        [MenuItem("AssetBundles/AssetBundle Folder/Clear Local Patches Folder")]
+        static void ClearLocalPatchesFolder()
         {
             if (Directory.Exists(AssetBundleUtility.LocalAssetBundlePath))
             {

@@ -80,10 +80,10 @@ namespace AssetBundles
 			
 			WriteServerURL();
 			
-			string args = Path.Combine (pathToApp, "AssetBundles");
+			string args = Path.Combine (pathToApp, BuildAssetBundles.PatchesOutputPath);
 			args = string.Format("\"{0}\" {1}", args, Process.GetCurrentProcess().Id);
 			ProcessStartInfo startInfo = ExecuteInternalMono.GetProfileStartInfoForMono(MonoInstallationFinder.GetMonoInstallation("MonoBleedingEdge"), "4.0", pathToAssetServer, args, true);
-			startInfo.WorkingDirectory = Path.Combine(System.Environment.CurrentDirectory, "AssetBundles");
+			startInfo.WorkingDirectory = Path.Combine(System.Environment.CurrentDirectory, BuildAssetBundles.PatchesOutputPath);
 			startInfo.UseShellExecute = false;
 			Process launchProcess = Process.Start(startInfo);
 			if (launchProcess == null || launchProcess.HasExited == true || launchProcess.Id == 0)
