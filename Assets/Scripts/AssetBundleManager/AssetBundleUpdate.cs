@@ -20,10 +20,15 @@ namespace AssetBundles
         public static Dictionary<string, AssetBundleInfo> LocalAssetBundleInfos = null;
         public static Dictionary<string, AssetBundleInfo> ServerAssetBundleInfos = null;
         public static Dictionary<string, AssetBundleInfo> DowloadAssetBundleInfos = null;
+        public static WWW DownloadingWWW = null;
 
         private static Dictionary<string, string> mDownloadingErrors = new Dictionary<string, string>();
-        private static Dictionary<string, WWW> mDoneWWWs = new Dictionary<string, WWW>();
+        private static Dictionary<string, WWW> mDoneWWWs = new Dictionary<string, WWW>();        
 
+        /// <summary>
+        /// 获取更新地址
+        /// </summary>
+        /// <returns></returns>
         public static string GetAssetBundleServerUrl()
         {
             TextAsset urlFile = Resources.Load("AssetBundleServerURL") as TextAsset;
@@ -35,10 +40,35 @@ namespace AssetBundles
             return url;
         }
 
+        /// <summary>
+        /// 设置更新地址
+        /// </summary>
+        /// <param name="absolutePath"></param>
         public static void SetSourceAssetBundleURL(string absolutePath)
         {
             BaseDownloadingURL = absolutePath + AssetBundleUtility.GetPlatformName() + "/";
         }
+
+        /// <summary>
+        /// 解析本地version文件
+        /// </summary>
+        /// <returns>
+        /// -1 = 本地version文件不存在
+        /// -2 = 解析version文件失败
+        /// </returns>
+        public static int ResolveLocalVersionFile()
+        {
+            string filePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName);
+            if (!File.Exists(filePath)) return -1;
+            string error = null;
+            if (!AssetBundleUtility.ResolveEncryptedVersionData(File.ReadAllBytes(filePath), ref LocalAssetBundleInfos, out error))
+            {
+                Debug.LogError("解析本地版本文件失败：" + error);
+                return -2;
+            }
+            return 0;
+        } 
+
 
         /// <summary>
         /// 比较本地和服务器version文件，确定需要下载的文件（新文件和MD5改变的文件）
@@ -99,6 +129,11 @@ namespace AssetBundles
             }
         }
 
+        /// <summary>
+        /// 获取下载文件数量和大小
+        /// </summary>
+        /// <param name="count"></param>
+        /// <param name="size"></param>
         public static void GetDowloadInfo(out int count, out float size)
         {
             count = 0;
@@ -117,16 +152,19 @@ namespace AssetBundles
         public static IEnumerator DownloadFile(string fileName)
         {
             WWW www = new WWW(BaseDownloadingURL + fileName);
+            DownloadingWWW = www;
             yield return www;
             if (www.error != null)
             {
                 mDownloadingErrors.Add(fileName, string.Format("Failed downloading file {0} from {1}: {2}", fileName, www.url, www.error));
+                DownloadingWWW = null;
                 yield break;
             }
 
             if (www.isDone)
-            {
+            {                
                 mDoneWWWs.Add(fileName, www);
+                DownloadingWWW = null;
             }
         }
 
@@ -193,8 +231,8 @@ namespace AssetBundles
             LocalAssetBundleInfos = null;
             ServerAssetBundleInfos = null;
             DowloadAssetBundleInfos = null;
-            mDownloadingErrors = null;
-            mDoneWWWs = null;
+            mDownloadingErrors.Clear();
+            mDoneWWWs.Clear();
         }
 
     }

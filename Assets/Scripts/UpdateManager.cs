@@ -2,9 +2,10 @@
 using UnityEngine.UI;
 using System.Collections;
 using System.IO;
+using System.Threading;
 using AssetBundles;
 
-public class GameManager : MonoBehaviour
+public class UpdateManager : MonoBehaviour
 {
 
     public GameObject UIPopMsg;
@@ -12,41 +13,80 @@ public class GameManager : MonoBehaviour
     public GameObject UIBottomMsg;
 
     GameObject mCube;
+    string mError = string.Empty;
+    bool mIsDecompressing = false;
+    int mZipFileNumber = 0;
+    int[] mDecompressProgress = new int[1];
 
-    // Use this for initialization
+    /// <summary>
+    /// 检查LocalAssetBundlePath路径下是否有VersionFileName文件
+    ///     有=>比较本地和服务器资源差异，更新资源
+    ///     无=>检查streamingAssetsPath路径下是否有ZipFileName
+    ///         有=>解包到LocalAssetBundlePath，检查资源更新
+    ///         无=>下载ZipFileName解包，检查资源更新
+    /// </summary>
+    /// <returns></returns>
     IEnumerator Start()
     {
-        string error = null;
+#if UNITY_EDITOR
+        if (AssetBundleUtility.SimulateAssetBundleInEditor)
+        {
+            yield break;
+        }        
+#endif
 
         AssetBundleUpdate.SetSourceAssetBundleURL(AssetBundleUpdate.GetAssetBundleServerUrl());
 
         //检查本地是否存在version文件
-        string localVersinFilePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName);
-        if (File.Exists(localVersinFilePath))
+        if (AssetBundleUpdate.ResolveLocalVersionFile() < 0)//没有本地版本文件信息
         {
-            Debug.Log("检查更新");
-            SetBottomMsg("检查更新");
-
-            //解析本地version文件
-            byte[] localVersionBytes = File.ReadAllBytes(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName));
-            if (!AssetBundleUtility.ResolveEncryptedVersionData(localVersionBytes, ref AssetBundleUpdate.LocalAssetBundleInfos, out error))
+            string zipFilePath = Path.Combine(Application.streamingAssetsPath, AssetBundleUtility.ZipFileName);
+            if (!File.Exists(zipFilePath))
             {
-                Debug.Log(error);
+                SetBottomMsg("首次运行游戏，下载游戏资源包");
+                yield return StartCoroutine(AssetBundleUpdate.DownloadFile(AssetBundleUtility.ZipFileName));
+                if (AssetBundleUpdate.GetDownloadingError(AssetBundleUtility.ZipFileName, out mError))
+                {
+                    SetBottomMsg("下载游戏资源包失败：" + mError);
+                    yield break;
+                }
+                if (!AssetBundleUpdate.SaveFile(AssetBundleUtility.ZipFileName, out mError))
+                {
+                    SetBottomMsg(string.Format("{0}保存文件失败：{1}", AssetBundleUtility.ZipFileName, mError));
+                    yield break;
+                }
+                AssetBundleUpdate.RemoveDoneWWW(AssetBundleUtility.ZipFileName);
+                zipFilePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.ZipFileName);             
+            }
+            SetBottomMsg("解压游戏资源包");
+
+            mZipFileNumber = lzip.getTotalFiles(zipFilePath);
+            mIsDecompressing = true;
+            int res = 0;
+            Thread th = new Thread
+                (() =>
+                {
+                    res = lzip.decompress_File(zipFilePath, AssetBundleUtility.LocalAssetBundlePath, mDecompressProgress);
+                    mIsDecompressing = false;
+                });
+            th.Start();
+            while (mIsDecompressing)
+            {
+                yield return new WaitForSeconds(1);
+            }
+            if (res < 0)
+            {
+                SetBottomMsg(string.Format("解压资源失败：{0}", res));
                 yield break;
             }
-        }
-        else
-        {
-            Debug.Log("首次运行游戏，需下载初始游戏资源");
-            SetBottomMsg("首次运行游戏，需下载初始游戏资源");
         }
 
 
         //下载version文件
         yield return StartCoroutine(AssetBundleUpdate.DownloadFile(AssetBundleUtility.VersionFileName));
-        if (AssetBundleUpdate.GetDownloadingError(AssetBundleUtility.VersionFileName, out error))
+        if (AssetBundleUpdate.GetDownloadingError(AssetBundleUtility.VersionFileName, out mError))
         {
-            Debug.Log(string.Format("下载资源失败：{0}", error));           
+            Debug.Log(string.Format("下载资源失败：{0}", mError));
             yield break;
         }
 
@@ -54,9 +94,9 @@ public class GameManager : MonoBehaviour
         WWW wwwVersion;
         if (AssetBundleUpdate.GetDoneWWW(AssetBundleUtility.VersionFileName, out wwwVersion))
         {
-            if (!AssetBundleUtility.ResolveEncryptedVersionData(wwwVersion.bytes, ref AssetBundleUpdate.ServerAssetBundleInfos, out error))
+            if (!AssetBundleUtility.ResolveEncryptedVersionData(wwwVersion.bytes, ref AssetBundleUpdate.ServerAssetBundleInfos, out mError))
             {
-                Debug.Log(error);
+                Debug.Log(mError);
                 yield break;
             }
         }
@@ -81,14 +121,14 @@ public class GameManager : MonoBehaviour
         foreach (var item in AssetBundleUpdate.DowloadAssetBundleInfos)
         {
             yield return StartCoroutine(AssetBundleUpdate.DownloadFile(item.Value.MD5));
-            if (AssetBundleUpdate.GetDownloadingError(item.Value.MD5, out error))
+            if (AssetBundleUpdate.GetDownloadingError(item.Value.MD5, out mError))
             {
-                Debug.Log(string.Format("下载资源失败：{0}", error));
+                Debug.Log(string.Format("下载资源失败：{0}", mError));
                 yield break;
             }
-            if (!AssetBundleUpdate.SaveFile(item.Value.MD5, out error))
+            if (!AssetBundleUpdate.SaveFile(item.Value.MD5, out mError))
             {
-                Debug.Log(error);
+                Debug.Log(mError);
                 yield break;
             }
             downloadCount++;
@@ -99,33 +139,37 @@ public class GameManager : MonoBehaviour
         }
 
         //保存version文件
-        if (!AssetBundleUpdate.SaveFile(AssetBundleUtility.VersionFileName, out error))
+        if (!AssetBundleUpdate.SaveFile(AssetBundleUtility.VersionFileName, out mError))
         {
-            Debug.Log(error);
+            Debug.Log(mError);
             yield break;
         }
 
-        Debug.Log("更新完成");
         SetBottomMsg("更新完成");
         AssetBundleUpdate.Clear();
 
         //加载AssetBundleLoader
-        Debug.Log("初始化AssetBundleLoader");
         SetBottomMsg("初始化资源");
-        gameObject.AddComponent<AssetBundleLoader>();
         yield return StartCoroutine(AssetBundleLoader.Instance.Init());
-        Debug.Log("初始化AssetBundleLoader完成");
         SetBottomMsg("初始化资源完成");
     }
 
     // Update is called once per frame
     void Update()
     {
-
+        if (AssetBundleUpdate.DownloadingWWW != null)
+        {
+            UpdateProgress(AssetBundleUpdate.DownloadingWWW.progress);
+        }
+        if (mIsDecompressing)
+        {
+            UpdateProgress(mDecompressProgress[0] / (float)mZipFileNumber);
+        }
     }
 
     void SetBottomMsg(string text)
     {
+        Debug.Log(text);
         Text textCpt = UIBottomMsg.GetComponent<Text>();
         textCpt.text = text;
     }

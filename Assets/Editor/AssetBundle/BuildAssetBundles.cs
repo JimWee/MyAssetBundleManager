@@ -5,15 +5,31 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
 
 namespace AssetBundles
 {
     public class BuildAssetBundles
-    {
-        public const string AssetBundleResourcesPath = "Assets/AssetBundleResources";
+    {        
         public const string AssetBundlesOutputPath = "AssetBundles";
         public const string PatchesOutputPath = "Patches";
         public const string ChangeLogFileName = "ChangeLog.txt";
+        public static string ZipFileOutputPath = Application.streamingAssetsPath;
+        public const int LevelOfCompression = 9; //(0-10)
+
+        const string kSimulationMode = "AssetBundles/Simulation Mode";
+        [MenuItem(kSimulationMode)]
+        public static void ToggleSimulationMode()
+        {
+            AssetBundleUtility.SimulateAssetBundleInEditor = !AssetBundleUtility.SimulateAssetBundleInEditor;
+        }
+
+        [MenuItem(kSimulationMode, true)]
+        public static bool ToggleSimulationModeValidate()
+        {
+            Menu.SetChecked(kSimulationMode, AssetBundleUtility.SimulateAssetBundleInEditor);
+            return true;
+        }
 
         [MenuItem("AssetBundles/Build AssetBundles")]
         static public void Build()
@@ -29,7 +45,7 @@ namespace AssetBundles
 
             List<AssetBundleBuild> builds = new List<AssetBundleBuild>();
 
-            string[] lookFor = new string[] { AssetBundleResourcesPath };           
+            string[] lookFor = new string[] { AssetBundleUtility.AssetBundleResourcesPath };           
             string[] guids = AssetDatabase.FindAssets("", lookFor);
             foreach (var guid in guids)
             {
@@ -62,12 +78,15 @@ namespace AssetBundles
             File.WriteAllBytes(Path.Combine(outputPath, AssetBundleUtility.VersionFileName), Encoding.UTF8.GetBytes(sb.ToString()));
             EditorUtility.ClearProgressBar();
 
-            EditorUtility.DisplayDialog("Build AssetBundles", "Build Success!", "OK");
+            if(!EditorUtility.DisplayDialog("Build AssetBundles", "Build Success!", "OK", "Open Contain Folder"))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", "/select," + Path.GetFullPath(outputPath));
+            }
         }
 
         static string AssetPathToAssetBundleName(string assetPath)
         {     
-            string assetbundleName = assetPath.Replace(AssetBundleResourcesPath + "/", "");
+            string assetbundleName = assetPath.Replace(AssetBundleUtility.AssetBundleResourcesPath + "/", "");
             return assetbundleName.Substring(0, assetbundleName.LastIndexOf('.'));            
         }
 
@@ -135,11 +154,46 @@ namespace AssetBundles
             File.WriteAllBytes(Path.Combine(patchesOutputPath, AssetBundleUtility.VersionFileName), AssetBundleUtility.Encrypt(bytes, AssetBundleUtility.SecretKey));
 
             //changelog
-            File.WriteAllBytes(Path.Combine(patchesOutputPath, ChangeLogFileName), Encoding.UTF8.GetBytes(keepFilesSB.ToString() + addFilesSB.ToString() + deleteFilesSB.ToString()));
+            File.WriteAllBytes(Path.Combine(PatchesOutputPath, AssetBundleUtility.GetPlatformName() + ChangeLogFileName), Encoding.UTF8.GetBytes(keepFilesSB.ToString() + addFilesSB.ToString() + deleteFilesSB.ToString()));
 
             EditorUtility.ClearProgressBar();
-            EditorUtility.DisplayDialog("Update Resources Files", "Update Success!", "OK");
+            if(!EditorUtility.DisplayDialog("Update Resources Files", "Update Success!", "OK", "Open Contain Folder"))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", "/select," + Path.GetFullPath(patchesOutputPath));
+            }
         }
+
+        [MenuItem("AssetBundles/Build Resources Zip")]
+        static void BuildResourcesZip()
+        {
+            string inputPath = Path.Combine(PatchesOutputPath, AssetBundleUtility.GetPlatformName());
+            string outputFileName = Path.Combine(ZipFileOutputPath, AssetBundleUtility.ZipFileName);
+
+            if (!Directory.Exists(ZipFileOutputPath))
+            {
+                Directory.CreateDirectory(ZipFileOutputPath);
+            }
+            if (File.Exists(outputFileName))
+            {
+                File.Delete(outputFileName);
+            }
+
+            int progress = 0;
+            DirectoryInfo dirInfo = new DirectoryInfo(inputPath);
+            FileInfo[] fileInfos = dirInfo.GetFiles();
+            foreach (var item in fileInfos)
+            {
+                progress++;
+                EditorUtility.DisplayProgressBar("Build Resources Zip", string.Format("{0}/{1}  {2}", progress, fileInfos.Length, item.Name), progress / (float)fileInfos.Length);
+                lzip.compress_File(LevelOfCompression, outputFileName, item.FullName, true);
+            }
+            EditorUtility.ClearProgressBar();
+            if(!EditorUtility.DisplayDialog("Build Resources Zip ", "Build Success!", "OK", "Open Contain Folder"))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", "/select," + Path.GetFullPath(outputFileName));
+            }
+        }
+
 
         [MenuItem("AssetBundles/AssetBundle Folder/Open Local Patches Folder")]
         static void OpenLocalPatchesFolder()

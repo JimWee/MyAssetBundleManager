@@ -3,6 +3,9 @@ using UnityEngine.SceneManagement;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace AssetBundles
 {
@@ -45,6 +48,13 @@ namespace AssetBundles
 
         public IEnumerator Init()
         {
+#if UNITY_EDITOR
+            if (AssetBundleUtility.SimulateAssetBundleInEditor)
+            {
+                yield break;
+            }
+#endif
+
             //解析version文件
             string error = "";
             byte[] versionBytes = File.ReadAllBytes(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName));
@@ -65,6 +75,12 @@ namespace AssetBundles
 
         public Object LoadAsset(string assetPath)
         {
+#if UNITY_EDITOR
+            if (AssetBundleUtility.SimulateAssetBundleInEditor)
+            {
+                return AssetDatabase.LoadMainAssetAtPath(Path.Combine(AssetBundleUtility.AssetBundleResourcesPath, assetPath) + ".prefab");
+            }
+#endif
             AssetBundle bundle = LoadAssetBundleWithDependencies(assetPath);
             string assetName = Path.GetFileName(assetPath);
             return bundle.LoadAsset(assetName);
@@ -72,6 +88,14 @@ namespace AssetBundles
 
         public IEnumerator LoadAssetAsync(string assetPath, OnLoadAssetFinished onLoadAssetFinished)
         {
+#if UNITY_EDITOR
+            if (AssetBundleUtility.SimulateAssetBundleInEditor)
+            {
+                Object asset = AssetDatabase.LoadMainAssetAtPath(Path.Combine(AssetBundleUtility.AssetBundleResourcesPath, assetPath) + ".prefab");
+                onLoadAssetFinished(asset);
+                yield break;
+            }
+#endif
             yield return StartCoroutine(LoadAssetBundleWithDependenciesAsync(assetPath));
             AssetBundle bundle = mLoadedAssetBundles[assetPath].mAssetBundle;
             string assetName = Path.GetFileName(assetPath);
@@ -92,6 +116,13 @@ namespace AssetBundles
         /// <param name="mode"></param>
         public void LoadScene(string scenePath, LoadSceneMode mode = LoadSceneMode.Single)
         {
+#if UNITY_EDITOR
+            if (AssetBundleUtility.SimulateAssetBundleInEditor)
+            {
+                EditorApplication.LoadLevelAsyncInPlayMode(Path.Combine(AssetBundleUtility.AssetBundleResourcesPath, scenePath) + ".unity");
+                return;
+            }
+#endif
             LoadAssetBundleWithDependencies(scenePath);
             SceneManager.LoadScene(Path.GetFileName(scenePath), mode);
         }

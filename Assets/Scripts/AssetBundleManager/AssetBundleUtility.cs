@@ -13,9 +13,33 @@ namespace AssetBundles
 {
     public class AssetBundleUtility
     {
+#if UNITY_EDITOR
+        static int m_SimulateAssetBundleInEditor = -1;
+        const string kSimulateAssetBundles = "SimulateAssetBundles";
+        public static bool SimulateAssetBundleInEditor
+        {
+            get
+            {
+                if (m_SimulateAssetBundleInEditor == -1)
+                    m_SimulateAssetBundleInEditor = EditorPrefs.GetBool(kSimulateAssetBundles, true) ? 1 : 0;
+
+                return m_SimulateAssetBundleInEditor != 0;
+            }
+            set
+            {
+                int newValue = value ? 1 : 0;
+                if (newValue != m_SimulateAssetBundleInEditor)
+                {
+                    m_SimulateAssetBundleInEditor = newValue;
+                    EditorPrefs.SetBool(kSimulateAssetBundles, value);
+                }
+            }
+        }
+        public const string AssetBundleResourcesPath = "Assets/AssetBundleResources";
+#endif
         public static string LocalAssetBundlePath = Application.persistentDataPath + "/Patches";
         public static string VersionFileName = "version";
-        public static bool ForceRedowload = false;
+        public static string ZipFileName = "Resources.zip";
         public static string SecretKey = "12345678";
 
         public static bool ResolveEncryptedVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out string error)
@@ -147,7 +171,7 @@ namespace AssetBundles
             MemoryStream ms = new MemoryStream();
             CryptoStream cs = new CryptoStream(ms, des.CreateEncryptor(), CryptoStreamMode.Write);
             cs.Write(bytes, 0, bytes.Length);
-            cs.Flush();
+            cs.FlushFinalBlock();
             return ms.ToArray();
         }
 
@@ -159,7 +183,7 @@ namespace AssetBundles
             MemoryStream ms = new MemoryStream();
             CryptoStream cs = new CryptoStream(ms, des.CreateDecryptor(), CryptoStreamMode.Write);
             cs.Write(bytes, 0, bytes.Length);
-            cs.Flush();
+            cs.FlushFinalBlock();
             return ms.ToArray();
         }
 
