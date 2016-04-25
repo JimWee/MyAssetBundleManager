@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.UI;
 using System.Collections;
 using System.IO;
 using UnityEngine.Experimental.Networking;
@@ -12,6 +13,9 @@ namespace HttpDownloader
 
         public string Url = "http://192.168.1.109:7788/";
         public string FileName = "1.zip";
+        public GameObject UIProgress;
+        Text mUIText;
+        Slider mUISlider;
         byte[] mBuff = new byte[1024 * 1024];
         UnityWebRequest mUwr;
         bool mIsDownloading = false;
@@ -19,10 +23,13 @@ namespace HttpDownloader
         // Use this for initialization
         void Start()
         {
+            mUIText = UIProgress.transform.Find("Text").GetComponent<Text>();
+            mUISlider = UIProgress.GetComponent<Slider>();
             //StartCoroutine(GetTextWWW());
             //StartCoroutine(GetText());
             //GetTextHttp();
-            StartCoroutine(Download());
+            //StartCoroutine(Download());
+            StartCoroutine(Head());
         }
 
         // Update is called once per frame
@@ -30,14 +37,46 @@ namespace HttpDownloader
         {
             if (mIsDownloading && mUwr != null)
             {
-                Debug.Log(mUwr.downloadProgress);
+                //Debug.Log(mUwr.downloadProgress);
+                float progress = mUwr.downloadProgress;
+                mUIText.text = string.Format("{0:F}%", progress * 100);
+                mUISlider.value = progress;
             }            
+        }
+
+
+        IEnumerator Head()
+        {
+            UnityWebRequest uwr = UnityWebRequest.Head(Url + FileName);           
+            yield return uwr.Send();
+            if (uwr.isError)
+            {
+                Debug.Log(uwr.error);
+            }
+            Debug.Log("responseCode:" + uwr.responseCode);
+            foreach (var item in uwr.GetResponseHeaders())
+            {
+                Debug.Log(item.Key + ":" + item.Value);
+            }
         }
 
         IEnumerator Download()
         {
+            string filePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, FileName);
             mUwr = new UnityWebRequest(Url + FileName, UnityWebRequest.kHttpVerbGET);
-            mUwr.downloadHandler = new DownloadHandlerFile(mBuff, Path.Combine(AssetBundleUtility.LocalAssetBundlePath, FileName));
+            if (File.Exists(filePath))
+            {
+                Debug.Log("Continue");
+                long fileSize = new FileInfo(filePath).Length;
+                mUwr.downloadHandler = new DownloadHandlerFile(mBuff, filePath, FileMode.Append);
+                mUwr.SetRequestHeader("Range", string.Format("bytes={0}-", fileSize));
+            }
+            else
+            {
+                Debug.Log("New");
+                mUwr.downloadHandler = new DownloadHandlerFile(mBuff, filePath);
+            }
+            
             mIsDownloading = true;
             yield return mUwr.Send();
             mIsDownloading = false;
@@ -58,6 +97,7 @@ namespace HttpDownloader
             }
             else
             {
+                Debug.Log("responseCode:" + www.responseCode);
                 Debug.Log(Time.realtimeSinceStartup);
                 // Or retrieve results as binary data
                 byte[] results = www.downloadHandler.data;
