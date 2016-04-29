@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using UnityEngine.Experimental.Networking;
 
 namespace AssetBundles
 {
@@ -12,6 +13,9 @@ namespace AssetBundles
         public string MD5;
         public int Size;
     }
+
+    public delegate void OnGetRemoteFileInfo(string error, long fileSize, DateTime lastModified);
+    public delegate void OnDownloadFileFinished(string error);
 
     public class AssetBundleUpdate
     {
@@ -149,72 +153,177 @@ namespace AssetBundles
             return;
         }
 
-        public static IEnumerator DownloadFile(string fileName)
+        /// <summary>
+        /// 获取下载文件的大小和最后修改时间
+        /// </summary>
+        /// <param name="url"></param>
+        /// <param name="onGetRemoteFileInfo"></param>
+        /// <returns></returns>
+        public static IEnumerator GetRemoteFileInfo(string fileName, OnGetRemoteFileInfo onGetRemoteFileInfo)
         {
-            WWW www = new WWW(BaseDownloadingURL + fileName);
-            DownloadingWWW = www;
-            yield return www;
-            if (www.error != null)
+            string url = BaseDownloadingURL + fileName;
+            using (UnityWebRequest request = UnityWebRequest.Head(url))
             {
-                mDownloadingErrors.Add(fileName, string.Format("Failed downloading file {0} from {1}: {2}", fileName, www.url, www.error));
-                DownloadingWWW = null;
-                yield break;
-            }
-
-            if (www.isDone)
-            {                
-                mDoneWWWs.Add(fileName, www);
-                DownloadingWWW = null;
-            }
-        }
-
-        public static bool SaveFile(string fileName, out string error)
-        {
-            WWW www;
-            if (mDoneWWWs.TryGetValue(fileName, out www))
-            {
-                try
+                yield return request.Send();
+                if (request.isError)
                 {
-                    string filePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, fileName);
-                    string dir = Path.GetDirectoryName(filePath);
-                    if (!Directory.Exists(dir))
-                    {
-                        Directory.CreateDirectory(dir);
-                    }
-                    File.WriteAllBytes(filePath, www.bytes);
-                    error = null;
-                    return true;
+                    string error = string.Format("GetRemoteFileInfo - url: {0}, responseCode: {1}, error: {2}",
+                                                    url, request.responseCode, request.error);
+                    onGetRemoteFileInfo(error, 0, DateTime.Now);
+                    yield break;
                 }
-                catch (Exception ex)
+                string strLength = request.GetResponseHeader("Content-Length");
+                if (string.IsNullOrEmpty(strLength))
                 {
-
-                    error = ex.ToString();
-                    return false;
-                }                
-            }
-            else
-            {
-                error = string.Format("file www don't exist: {0}", fileName);
-                return false;
+                    onGetRemoteFileInfo("GetRemoteFileInfo - can not get Content-Length", 0, DateTime.Now);
+                    yield break;
+                }
+                long fileSize = Convert.ToInt64(strLength);
+                string strDateTime = request.GetResponseHeader("Last-Modified");
+                if (string.IsNullOrEmpty(strDateTime))
+                {
+                    onGetRemoteFileInfo("GetRemoteFileInfo - can not get Last-Modified", 0, DateTime.Now);
+                    yield break;
+                }
+                DateTime lastModified = DateTime.Parse(strDateTime);
+                onGetRemoteFileInfo(null, fileSize, lastModified);
             }
         }
 
-        public static bool GetDoneWWW(string fileName, out WWW www)
+        /// <summary>
+        /// 下载文件
+        /// </summary>
+        /// <param name="fileName"></param>
+        /// <param name="fileMode">Append为断点续传，Create为新建文件</param>
+        /// <param name="remoteFileSize">Append模式下必传，远端文件大小</param>
+        /// <param name="remoteLastModified">Append模式下必传，远端文件最后修改日期</param>
+        /// <returns></returns>
+        public static IEnumerator DownloadFile(string fileName, OnDownloadFileFinished onDownloadFileFinidhed,
+            FileMode fileMode = FileMode.Create, long remoteFileSize = 0, DateTime remoteLastModified = new DateTime())
         {
-            return mDoneWWWs.TryGetValue(fileName, out www);
+            string url = BaseDownloadingURL + fileName;
+            string filePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, fileName);
+            using (UnityWebRequest request = new UnityWebRequest(url, UnityWebRequest.kHttpVerbGET))
+            {
+                if (File.Exists(filePath) && fileMode == FileMode.Append)
+                {
+                    FileInfo localFileInfo = new FileInfo(filePath);
+                    bool isOutdate = remoteLastModified > localFileInfo.LastWriteTime;
+                    if(localFileInfo.Length == remoteFileSize && !isOutdate)//已下载完成
+                    {
+                        onDownloadFileFinidhed(null);
+                        yield break;
+                    }
+                    if (localFileInfo.Length < remoteFileSize && !isOutdate)//继续下载
+                    {
+                        request.downloadHandler = new DownloadHandlerFile(filePath, FileMode.Append);
+                        request.SetRequestHeader("Range", string.Format("bytes={0}-", localFileInfo.Length));
+                    }
+                }
+            }
         }
 
-        public static bool RemoveDoneWWW(string fileName)
+        /// <summary>
+        /// 文件是否过时
+        /// </summary>
+        /// <param name="fileName"></param>
+        /// <param name="remoteFileSize"></param>
+        /// <param name="remoteFileLastModified"></param>
+        /// <returns>
+        ///     1：过时
+        ///     0：已下载完成
+        ///     -1：需要继续下载
+        /// </returns>
+        private static int IsFileOutdate(string fileName, long remoteFileSize, DateTime remoteFileLastModified)
         {
-            WWW www;
-            if (mDoneWWWs.TryGetValue(fileName, out www))
+            string filePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, fileName);
+            if (!File.Exists(filePath))
             {
-                www.Dispose();
-                mDoneWWWs.Remove(fileName);
-                return true;
+                return 1;
             }
-            return false;
+            FileInfo localFileInfo = new FileInfo(filePath);
+            if (remoteFileLastModified >= localFileInfo.LastWriteTime)
+            {
+                return 1;
+            }
+            if (localFileInfo.Length > remoteFileSize)
+            {
+                return 1;
+            }
+            if (localFileInfo.Length == remoteFileSize)
+            {
+                return 0;
+            }
+            return -1;
+
         }
+
+        //public static IEnumerator DownloadFile(string fileName)
+        //{
+        //    WWW www = new WWW(BaseDownloadingURL + fileName);
+        //    DownloadingWWW = www;
+        //    yield return www;
+        //    if (www.error != null)
+        //    {
+        //        mDownloadingErrors.Add(fileName, string.Format("Failed downloading file {0} from {1}: {2}", fileName, www.url, www.error));
+        //        DownloadingWWW = null;
+        //        yield break;
+        //    }
+
+        //    if (www.isDone)
+        //    {                
+        //        mDoneWWWs.Add(fileName, www);
+        //        DownloadingWWW = null;
+        //    }
+        //}
+
+        //public static bool SaveFile(string fileName, out string error)
+        //{
+        //    WWW www;
+        //    if (mDoneWWWs.TryGetValue(fileName, out www))
+        //    {
+        //        try
+        //        {
+        //            string filePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, fileName);
+        //            string dir = Path.GetDirectoryName(filePath);
+        //            if (!Directory.Exists(dir))
+        //            {
+        //                Directory.CreateDirectory(dir);
+        //            }
+        //            File.WriteAllBytes(filePath, www.bytes);
+        //            error = null;
+        //            return true;
+        //        }
+        //        catch (Exception ex)
+        //        {
+
+        //            error = ex.ToString();
+        //            return false;
+        //        }                
+        //    }
+        //    else
+        //    {
+        //        error = string.Format("file www don't exist: {0}", fileName);
+        //        return false;
+        //    }
+        //}
+
+        //public static bool GetDoneWWW(string fileName, out WWW www)
+        //{
+        //    return mDoneWWWs.TryGetValue(fileName, out www);
+        //}
+
+        //public static bool RemoveDoneWWW(string fileName)
+        //{
+        //    WWW www;
+        //    if (mDoneWWWs.TryGetValue(fileName, out www))
+        //    {
+        //        www.Dispose();
+        //        mDoneWWWs.Remove(fileName);
+        //        return true;
+        //    }
+        //    return false;
+        //}
 
         public static bool GetDownloadingError(string fileName, out string error)
         {

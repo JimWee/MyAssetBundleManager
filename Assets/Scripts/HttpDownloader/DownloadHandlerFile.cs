@@ -2,16 +2,20 @@
 using UnityEngine.Experimental.Networking;
 using System.Collections;
 using System.IO;
+using System.Timers;
 
 
-namespace HttpDownloader
+namespace UnityEngine.Experimental.Networking
 {
     class DownloadHandlerFile : DownloadHandlerScript
     {
         FileStream mFileStream;
         long mLocalFileSize = 0;
         long mTotalFileSize = 0;
+        long mPreSize = 0;
         long mCurrentSize = 0;
+        Timer mTimer;
+        float mDownloadSpeed = 0;
 
         public DownloadHandlerFile(string filePath, FileMode fileMode = FileMode.Create) 
             : base()
@@ -25,6 +29,15 @@ namespace HttpDownloader
             Init(filePath, fileMode);
         }
 
+        new public void Dispose()
+        {
+            base.Dispose();
+            if (mFileStream != null)
+            {
+                mFileStream.Close();
+            }
+        }
+
         private void Init(string filePath, FileMode fileMode)
         {
             mFileStream = new FileStream(filePath, fileMode);
@@ -32,6 +45,12 @@ namespace HttpDownloader
             {
                 mLocalFileSize = (File.Exists(filePath)) ? (new FileInfo(filePath)).Length : 0;
             }
+
+            //定时器，计算下载速度
+            mTimer = new Timer(1000);
+            mTimer.Elapsed += (object source, ElapsedEventArgs e) => { mDownloadSpeed = mCurrentSize - mPreSize; mPreSize = mCurrentSize; };
+            mTimer.AutoReset = true;
+            mTimer.Start();
         }
 
         protected override byte[] GetData()
@@ -60,7 +79,7 @@ namespace HttpDownloader
         protected override void ReceiveContentLength(int contentLength)
         {
             mTotalFileSize = contentLength;
-            Debug.Log(string.Format("DownloadHandlerFiles :: ReceiveContentLength - length {0}", contentLength));
+            //Debug.Log(string.Format("DownloadHandlerFiles :: ReceiveContentLength - length {0}", contentLength));
         }
 
         protected override bool ReceiveData(byte[] data, int dataLength)
@@ -82,8 +101,15 @@ namespace HttpDownloader
 
         protected override void CompleteContent()
         {
-            Debug.Log("DownloadHandlerFile :: CompleteContent - DOWNLOAD COMPLETE!");
+            //Debug.Log("DownloadHandlerFile :: CompleteContent - DOWNLOAD COMPLETE!");
             mFileStream.Close();
+            mTimer.Close();
+            mDownloadSpeed = 0;
+        }
+
+        public float GetDownloadSpeed()
+        {
+            return mDownloadSpeed;
         }
     }
 }
