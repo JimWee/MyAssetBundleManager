@@ -14,8 +14,8 @@ namespace AssetBundles
         public int Size;
     }
 
-    public delegate void OnGetRemoteFileInfo(string error, long fileSize, DateTime lastModified);
-    public delegate void OnDownloadFileFinished(string error);
+    public delegate void OnGetRemoteFileInfo(string fileName, string error, long fileSize, DateTime lastModified);
+    public delegate void OnDownloadFileFinished(string fileName, string error);
 
     public class AssetBundleUpdate
     {
@@ -24,10 +24,8 @@ namespace AssetBundles
         public static Dictionary<string, AssetBundleInfo> LocalAssetBundleInfos = null;
         public static Dictionary<string, AssetBundleInfo> ServerAssetBundleInfos = null;
         public static Dictionary<string, AssetBundleInfo> DowloadAssetBundleInfos = null;
-        public static WWW DownloadingWWW = null;
 
-        private static Dictionary<string, string> mDownloadingErrors = new Dictionary<string, string>();
-        private static Dictionary<string, WWW> mDoneWWWs = new Dictionary<string, WWW>();        
+        public static UnityWebRequest CurrentRequest = null;      
 
         /// <summary>
         /// 获取更新地址
@@ -169,24 +167,24 @@ namespace AssetBundles
                 {
                     string error = string.Format("GetRemoteFileInfo - url: {0}, responseCode: {1}, error: {2}",
                                                     url, request.responseCode, request.error);
-                    onGetRemoteFileInfo(error, 0, DateTime.Now);
+                    onGetRemoteFileInfo(fileName, error, 0, DateTime.Now);
                     yield break;
                 }
                 string strLength = request.GetResponseHeader("Content-Length");
                 if (string.IsNullOrEmpty(strLength))
                 {
-                    onGetRemoteFileInfo("GetRemoteFileInfo - can not get Content-Length", 0, DateTime.Now);
+                    onGetRemoteFileInfo(fileName, "GetRemoteFileInfo - can not get Content-Length", 0, DateTime.Now);
                     yield break;
                 }
                 long fileSize = Convert.ToInt64(strLength);
                 string strDateTime = request.GetResponseHeader("Last-Modified");
                 if (string.IsNullOrEmpty(strDateTime))
                 {
-                    onGetRemoteFileInfo("GetRemoteFileInfo - can not get Last-Modified", 0, DateTime.Now);
+                    onGetRemoteFileInfo(fileName, "GetRemoteFileInfo - can not get Last-Modified", 0, DateTime.Now);
                     yield break;
                 }
                 DateTime lastModified = DateTime.Parse(strDateTime);
-                onGetRemoteFileInfo(null, fileSize, lastModified);
+                onGetRemoteFileInfo(fileName, null, fileSize, lastModified);
             }
         }
 
@@ -211,7 +209,7 @@ namespace AssetBundles
                     bool isOutdate = remoteLastModified > localFileInfo.LastWriteTime;
                     if(localFileInfo.Length == remoteFileSize && !isOutdate)//已下载完成
                     {
-                        onDownloadFileFinidhed(null);
+                        onDownloadFileFinidhed(fileName, null);
                         yield break;
                     }
                     if (localFileInfo.Length < remoteFileSize && !isOutdate)//继续下载
@@ -219,120 +217,41 @@ namespace AssetBundles
                         request.downloadHandler = new DownloadHandlerFile(filePath, FileMode.Append);
                         request.SetRequestHeader("Range", string.Format("bytes={0}-", localFileInfo.Length));
                     }
+                    else//重新下载
+                    {
+                        request.downloadHandler = new DownloadHandlerFile(filePath);
+                    }
                 }
+                else
+                {
+                    request.downloadHandler = new DownloadHandlerFile(filePath);
+                }
+                CurrentRequest = request;
+                yield return request.Send();
+                string error = request.isError ?
+                    string.Format("DownloadFile Failed - url: {0}, responseCode: {1}, error: {2}", url, request.responseCode, request.error)
+                    : null;
+                onDownloadFileFinidhed(fileName, error);
             }
+            CurrentRequest = null;
         }
 
-        /// <summary>
-        /// 文件是否过时
-        /// </summary>
-        /// <param name="fileName"></param>
-        /// <param name="remoteFileSize"></param>
-        /// <param name="remoteFileLastModified"></param>
-        /// <returns>
-        ///     1：过时
-        ///     0：已下载完成
-        ///     -1：需要继续下载
-        /// </returns>
-        private static int IsFileOutdate(string fileName, long remoteFileSize, DateTime remoteFileLastModified)
+        public static float GetDownloadSpeed()
         {
-            string filePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, fileName);
-            if (!File.Exists(filePath))
+            if (CurrentRequest != null)
             {
-                return 1;
+                return ((DownloadHandlerFile)CurrentRequest.downloadHandler).GetDownloadSpeed();
             }
-            FileInfo localFileInfo = new FileInfo(filePath);
-            if (remoteFileLastModified >= localFileInfo.LastWriteTime)
-            {
-                return 1;
-            }
-            if (localFileInfo.Length > remoteFileSize)
-            {
-                return 1;
-            }
-            if (localFileInfo.Length == remoteFileSize)
-            {
-                return 0;
-            }
-            return -1;
-
+            return 0;
         }
 
-        //public static IEnumerator DownloadFile(string fileName)
-        //{
-        //    WWW www = new WWW(BaseDownloadingURL + fileName);
-        //    DownloadingWWW = www;
-        //    yield return www;
-        //    if (www.error != null)
-        //    {
-        //        mDownloadingErrors.Add(fileName, string.Format("Failed downloading file {0} from {1}: {2}", fileName, www.url, www.error));
-        //        DownloadingWWW = null;
-        //        yield break;
-        //    }
-
-        //    if (www.isDone)
-        //    {                
-        //        mDoneWWWs.Add(fileName, www);
-        //        DownloadingWWW = null;
-        //    }
-        //}
-
-        //public static bool SaveFile(string fileName, out string error)
-        //{
-        //    WWW www;
-        //    if (mDoneWWWs.TryGetValue(fileName, out www))
-        //    {
-        //        try
-        //        {
-        //            string filePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, fileName);
-        //            string dir = Path.GetDirectoryName(filePath);
-        //            if (!Directory.Exists(dir))
-        //            {
-        //                Directory.CreateDirectory(dir);
-        //            }
-        //            File.WriteAllBytes(filePath, www.bytes);
-        //            error = null;
-        //            return true;
-        //        }
-        //        catch (Exception ex)
-        //        {
-
-        //            error = ex.ToString();
-        //            return false;
-        //        }                
-        //    }
-        //    else
-        //    {
-        //        error = string.Format("file www don't exist: {0}", fileName);
-        //        return false;
-        //    }
-        //}
-
-        //public static bool GetDoneWWW(string fileName, out WWW www)
-        //{
-        //    return mDoneWWWs.TryGetValue(fileName, out www);
-        //}
-
-        //public static bool RemoveDoneWWW(string fileName)
-        //{
-        //    WWW www;
-        //    if (mDoneWWWs.TryGetValue(fileName, out www))
-        //    {
-        //        www.Dispose();
-        //        mDoneWWWs.Remove(fileName);
-        //        return true;
-        //    }
-        //    return false;
-        //}
-
-        public static bool GetDownloadingError(string fileName, out string error)
+        public static float GetDownloadPorgress()
         {
-            return mDownloadingErrors.TryGetValue(fileName, out error);
-        }
-
-        public static bool RemoveDownloadingError(string fileName)
-        {
-            return mDownloadingErrors.Remove(fileName);
+            if (CurrentRequest != null)
+            {
+                return CurrentRequest.downloadProgress;
+            }
+            return 0;
         }
 
         public static void Clear()
@@ -340,8 +259,6 @@ namespace AssetBundles
             LocalAssetBundleInfos = null;
             ServerAssetBundleInfos = null;
             DowloadAssetBundleInfos = null;
-            mDownloadingErrors.Clear();
-            mDoneWWWs.Clear();
         }
 
     }

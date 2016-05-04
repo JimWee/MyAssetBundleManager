@@ -4,6 +4,7 @@ using System.Collections;
 using System.IO;
 using System.Threading;
 using AssetBundles;
+using System;
 
 public class UpdateManager : MonoBehaviour
 {
@@ -13,7 +14,11 @@ public class UpdateManager : MonoBehaviour
     public GameObject UIBottomMsg;
 
     GameObject mCube;
+    string mFileName = string.Empty;
     string mError = string.Empty;
+    long mFileSize = 0;
+    DateTime mLastModified;
+    bool mIsDownloading = false;
     bool mIsDecompressing = false;
     int mZipFileNumber = 0;
     int[] mDecompressProgress = new int[1];
@@ -41,21 +46,15 @@ public class UpdateManager : MonoBehaviour
         if (AssetBundleUpdate.ResolveLocalVersionFile() < 0)//没有本地版本文件信息
         {
             string zipFilePath = Path.Combine(Application.streamingAssetsPath, AssetBundleUtility.ZipFileName);
-            if (!File.Exists(zipFilePath))
+            if (!File.Exists(zipFilePath))//android下会有问题
             {
                 SetBottomMsg("首次运行游戏，下载游戏资源包");
-                yield return StartCoroutine(AssetBundleUpdate.DownloadFile(AssetBundleUtility.ZipFileName));
-                if (AssetBundleUpdate.GetDownloadingError(AssetBundleUtility.ZipFileName, out mError))
-                {
-                    SetBottomMsg("下载游戏资源包失败：" + mError);
-                    yield break;
-                }
-                if (!AssetBundleUpdate.SaveFile(AssetBundleUtility.ZipFileName, out mError))
-                {
-                    SetBottomMsg(string.Format("{0}保存文件失败：{1}", AssetBundleUtility.ZipFileName, mError));
-                    yield break;
-                }
-                AssetBundleUpdate.RemoveDoneWWW(AssetBundleUtility.ZipFileName);
+                yield return StartCoroutine(AssetBundleUpdate.GetRemoteFileInfo(AssetBundleUtility.ZipFileName, OnGetRemoteFileInfo));
+                if (CheckError()) yield break;
+                mIsDownloading = true;
+                yield return StartCoroutine(AssetBundleUpdate.DownloadFile(AssetBundleUtility.ZipFileName, OnDownloadFileFinidhed, FileMode.Append, mFileSize, mLastModified));
+                mIsDownloading = false;
+                if (CheckError()) yield break;
                 zipFilePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.ZipFileName);             
             }
             SetBottomMsg("解压游戏资源包");
@@ -83,26 +82,19 @@ public class UpdateManager : MonoBehaviour
 
 
         //下载version文件
-        yield return StartCoroutine(AssetBundleUpdate.DownloadFile(AssetBundleUtility.VersionFileName));
-        if (AssetBundleUpdate.GetDownloadingError(AssetBundleUtility.VersionFileName, out mError))
+        WWW wwwVersion = new WWW(AssetBundleUpdate.BaseDownloadingURL + AssetBundleUtility.VersionFileName);
+        yield return wwwVersion;
+        if (wwwVersion.error != null)
         {
-            Debug.Log(string.Format("下载资源失败：{0}", mError));
+            SetBottomMsg("下载资源列表失败");
+            Debug.LogError("Version file download failed");
             yield break;
         }
 
-        //解析服务器version文件
-        WWW wwwVersion;
-        if (AssetBundleUpdate.GetDoneWWW(AssetBundleUtility.VersionFileName, out wwwVersion))
+        //解析服务器version文件        
+        if (!AssetBundleUtility.ResolveEncryptedVersionData(wwwVersion.bytes, ref AssetBundleUpdate.ServerAssetBundleInfos, out mError))
         {
-            if (!AssetBundleUtility.ResolveEncryptedVersionData(wwwVersion.bytes, ref AssetBundleUpdate.ServerAssetBundleInfos, out mError))
-            {
-                Debug.Log(mError);
-                yield break;
-            }
-        }
-        else
-        {
-            Debug.Log(string.Format("获取WWW失败：{0}", AssetBundleUtility.VersionFileName));
+            Debug.Log(mError);
             yield break;
         }
 
@@ -120,17 +112,8 @@ public class UpdateManager : MonoBehaviour
         float downloadSize = 0;
         foreach (var item in AssetBundleUpdate.DowloadAssetBundleInfos)
         {
-            yield return StartCoroutine(AssetBundleUpdate.DownloadFile(item.Value.MD5));
-            if (AssetBundleUpdate.GetDownloadingError(item.Value.MD5, out mError))
-            {
-                Debug.Log(string.Format("下载资源失败：{0}", mError));
-                yield break;
-            }
-            if (!AssetBundleUpdate.SaveFile(item.Value.MD5, out mError))
-            {
-                Debug.Log(mError);
-                yield break;
-            }
+            yield return StartCoroutine(AssetBundleUpdate.DownloadFile(item.Value.MD5, OnDownloadFileFinidhed));
+            if (CheckError()) yield break;
             downloadCount++;
             downloadSize += item.Value.Size;
 
@@ -139,11 +122,7 @@ public class UpdateManager : MonoBehaviour
         }
 
         //保存version文件
-        if (!AssetBundleUpdate.SaveFile(AssetBundleUtility.VersionFileName, out mError))
-        {
-            Debug.Log(mError);
-            yield break;
-        }
+        File.WriteAllBytes(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName), wwwVersion.bytes);
 
         SetBottomMsg("更新完成");
         AssetBundleUpdate.Clear();
@@ -157,9 +136,9 @@ public class UpdateManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (AssetBundleUpdate.DownloadingWWW != null)
+        if (mIsDownloading)
         {
-            UpdateProgress(AssetBundleUpdate.DownloadingWWW.progress);
+            UpdateProgress(AssetBundleUpdate.GetDownloadPorgress());
         }
         if (mIsDecompressing)
         {
@@ -185,7 +164,7 @@ public class UpdateManager : MonoBehaviour
 
     public void LoadCubeAsync()
     {
-        StartCoroutine(AssetBundleLoader.Instance.LoadAssetAsync("prefab/mycube", delegate (Object asset) { mCube = Instantiate(asset) as GameObject; }));
+        StartCoroutine(AssetBundleLoader.Instance.LoadAssetAsync("prefab/mycube", delegate (UnityEngine.Object asset) { mCube = Instantiate(asset) as GameObject; }));
     }
 
     public void LoadCube()
@@ -212,5 +191,30 @@ public class UpdateManager : MonoBehaviour
     public void LoadSceneAsync()
     {
         StartCoroutine(AssetBundleLoader.Instance.LoadSceneAsync("scene/Scene2"));
+    }
+
+    bool CheckError()
+    {
+        if (!string.IsNullOrEmpty(mError))
+        {
+            Debug.LogError(mError);
+            SetBottomMsg("下载资源文件失败");
+            return true;
+        }
+        return false;
+    }
+
+    void OnGetRemoteFileInfo(string fileName, string error, long fileSize, DateTime lastModified)
+    {
+        mFileName = fileName;
+        mError = error;
+        mFileSize = fileSize;
+        mLastModified = lastModified;
+    }
+
+    void OnDownloadFileFinidhed(string fileName, string error)
+    {
+        mFileName = fileName;
+        mError = error;
     }
 }
