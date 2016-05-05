@@ -25,22 +25,7 @@ namespace AssetBundles
         public static Dictionary<string, AssetBundleInfo> ServerAssetBundleInfos = null;
         public static Dictionary<string, AssetBundleInfo> DowloadAssetBundleInfos = null;
 
-        public static UnityWebRequest CurrentRequest = null;      
-
-        /// <summary>
-        /// 获取更新地址
-        /// </summary>
-        /// <returns></returns>
-        public static string GetAssetBundleServerUrl()
-        {
-            TextAsset urlFile = Resources.Load("AssetBundleServerURL") as TextAsset;
-            string url = (urlFile != null) ? urlFile.text.Trim() : null;
-            if (url == null || url.Length == 0)
-            {
-                Debug.LogError("Server URL could not be found.");
-            }
-            return url;
-        }
+        public static UnityWebRequest CurrentRequest = null;
 
         /// <summary>
         /// 设置更新地址

@@ -8,7 +8,7 @@ using System;
 
 public class UpdateManager : MonoBehaviour
 {
-
+    public string URL;
     public GameObject UIPopMsg;
     public GameObject UIProgressBar;
     public GameObject UIBottomMsg;
@@ -40,7 +40,7 @@ public class UpdateManager : MonoBehaviour
         }        
 #endif
 
-        AssetBundleUpdate.SetSourceAssetBundleURL(AssetBundleUpdate.GetAssetBundleServerUrl());
+        AssetBundleUpdate.SetSourceAssetBundleURL(URL);
 
         //检查本地是否存在version文件
         if (AssetBundleUpdate.ResolveLocalVersionFile() < 0)//没有本地版本文件信息
@@ -82,12 +82,13 @@ public class UpdateManager : MonoBehaviour
 
 
         //下载version文件
+        SetBottomMsg("下载资源列表");
         WWW wwwVersion = new WWW(AssetBundleUpdate.BaseDownloadingURL + AssetBundleUtility.VersionFileName);
         yield return wwwVersion;
         if (wwwVersion.error != null)
         {
             SetBottomMsg("下载资源列表失败");
-            Debug.LogError("Version file download failed");
+            Debug.LogErrorFormat("Version file download failed - url: {0}, error: {1}", wwwVersion.url, wwwVersion.error);
             yield break;
         }
 

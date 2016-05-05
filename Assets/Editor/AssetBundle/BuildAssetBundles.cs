@@ -167,7 +167,7 @@ namespace AssetBundles
         static void BuildResourcesZip()
         {
             string inputPath = Path.Combine(PatchesOutputPath, AssetBundleUtility.GetPlatformName());
-            string outputFileName = Path.Combine(ZipFileOutputPath, AssetBundleUtility.ZipFileName);
+            string outputFileName = Path.Combine(inputPath, AssetBundleUtility.ZipFileName);
 
             if (!Directory.Exists(ZipFileOutputPath))
             {
@@ -185,7 +185,12 @@ namespace AssetBundles
             {
                 progress++;
                 EditorUtility.DisplayProgressBar("Build Resources Zip", string.Format("{0}/{1}  {2}", progress, fileInfos.Length, item.Name), progress / (float)fileInfos.Length);
-                lzip.compress_File(LevelOfCompression, outputFileName, item.FullName, true);
+                int res = lzip.compress_File(LevelOfCompression, outputFileName, item.FullName, true);
+                if (res < 0)
+                {
+                    EditorUtility.DisplayDialog("Build Resources Zip", string.Format("Build Failed - fileName: {0}, errorCode: {1}", item.FullName, res), "OK");
+                    return;
+                }
             }
             EditorUtility.ClearProgressBar();
             if(!EditorUtility.DisplayDialog("Build Resources Zip ", "Build Success!", "OK", "Open Contain Folder"))
