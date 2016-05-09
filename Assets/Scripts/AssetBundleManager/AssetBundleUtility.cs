@@ -42,12 +42,45 @@ namespace AssetBundles
         public static string ZipFileName = "Resources.zip";
         public static string SecretKey = "12345678";
 
-        public static bool ResolveEncryptedVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out string error)
+
+        /// <summary>
+        /// 打印Dictionary<string, AssetBundleInfo>内容
+        /// </summary>
+        /// <param name="assetBundleInfos"></param>
+        public static void PrintAssetBundleInfos(Dictionary<string, AssetBundleInfo> assetBundleInfos)
         {
-            return ResolveDecryptedVersionData(Decrypt(bytes, SecretKey), ref assetBundleInfos, out error);
+            if (assetBundleInfos != null)
+            {
+                StringBuilder sb = new StringBuilder("PrintAssetBundleInfos");
+                foreach (var item in assetBundleInfos)
+                {
+                    sb.AppendFormat("name: {}, MD5: {}, size: {}\n", item.Value.AssetBundleName, item.Value.MD5, item.Value.Size);
+                }
+                Debug.Log(sb.ToString());
+            }
         }
 
-        public static bool ResolveDecryptedVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out string error)
+        /// <summary>
+        /// 解析加密的version文件
+        /// </summary>
+        /// <param name="bytes"></param>
+        /// <param name="assetBundleInfos"></param>
+        /// <param name="error"></param>
+        /// <returns></returns>
+        public static bool ResolveEncryptedVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out string versionID, out string error)
+        {
+            return ResolveDecryptedVersionData(Decrypt(bytes, SecretKey), ref assetBundleInfos, out versionID, out error);
+        }
+
+
+        /// <summary>
+        /// 解析未加密的version文件
+        /// </summary>
+        /// <param name="bytes"></param>
+        /// <param name="assetBundleInfos"></param>
+        /// <param name="error"></param>
+        /// <returns></returns>
+        public static bool ResolveDecryptedVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out string versionID, out string error)
         {
             try
             {
@@ -62,6 +95,7 @@ namespace AssetBundles
                 }
                 string text = Encoding.UTF8.GetString(bytes);
                 string[] items = text.Split('\n');
+                versionID = items[0];
                 foreach (var item in items)
                 {
                     string[] infos = item.Split('\t');
@@ -80,45 +114,82 @@ namespace AssetBundles
             catch (Exception ex)
             {
                 error = string.Format("Failed resolving version data: {0}", ex.ToString());
+                versionID = null;
                 return false;
             }
         }
 
-        public static bool CheckLocalAssetBundles(out Dictionary<string, AssetBundleInfo> errorAssetBundleInfos)
+        /// <summary>
+        /// 检查本地资源的完整性, 删除多余文件
+        /// </summary>
+        /// <param name="checkMD5"></param>
+        /// <param name="errorAssetBundleInfos"></param>
+        /// <returns></returns>
+        public static bool CheckLocalAssetBundles(bool checkMD5, out Dictionary<string, AssetBundleInfo> errorAssetBundleInfos)
         {
             errorAssetBundleInfos = new Dictionary<string, AssetBundleInfo>();
             string versionFilePath = Path.Combine(LocalAssetBundlePath, VersionFileName);
 
             if (!File.Exists(versionFilePath))
             {
-                Debug.Log(string.Format("File dosen't exist: {0}", VersionFileName));
+                Debug.LogError(string.Format("File dosen't exist: {0}", VersionFileName));
                 return false;
             }
 
             string error;
+            string versionID;
             Dictionary<string, AssetBundleInfo> assetBundleInfos = new Dictionary<string, AssetBundleInfo>();
-            if (!ResolveEncryptedVersionData(File.ReadAllBytes(versionFilePath), ref assetBundleInfos, out error))
+            if (!ResolveEncryptedVersionData(File.ReadAllBytes(versionFilePath), ref assetBundleInfos, out versionID, out error))
             {
-                Debug.Log("resolve local version file failed!");
+                Debug.LogErrorFormat("resolve local version file failed: {0}", error);
                 return false;
             }
+
+            //获取资源目录下现有文件列表
+            DirectoryInfo dirInfo = new DirectoryInfo(LocalAssetBundlePath);
+            FileInfo[] fileInfos = dirInfo.GetFiles();
+            Dictionary<string, FileInfo> files = new Dictionary<string, FileInfo>();
+            foreach (var item in fileInfos)
+            {
+                files.Add(item.Name, item);
+            }
+            files.Remove(VersionFileName);
+
+            //检查文件
             foreach (var item in assetBundleInfos)
             {
-                string assetBundleFilePath = Path.Combine(LocalAssetBundlePath, item.Value.AssetBundleName);
-                if (!File.Exists(assetBundleFilePath))
+                FileInfo fileInfo;
+                if (files.TryGetValue(item.Value.MD5, out fileInfo))
                 {
-                    errorAssetBundleInfos.Add(item.Key, item.Value);
+                    if (checkMD5)
+                    {
+                        if (GetMD5HashFromFile(fileInfo.FullName) != item.Value.MD5)
+                        {
+                            errorAssetBundleInfos.Add(item.Key, item.Value);
+                        }
+                        else
+                        {
+                            files.Remove(item.Value.MD5);
+                        }
+                    }
+                    else
+                    {
+                        files.Remove(item.Value.MD5);
+                    }
                 }
                 else
                 {
-                    string MD5 = GetMD5HashFromFile(assetBundleFilePath);
-                    if (!MD5.Equals(item.Value.MD5))
-                    {
-                        errorAssetBundleInfos.Add(item.Key, item.Value);
-                    }
+                    errorAssetBundleInfos.Add(item.Key, item.Value);
                 }
             }
-            return assetBundleInfos.Count == 0;
+
+            //删除多余文件
+            foreach (var item in files)
+            {
+                File.Delete(item.Value.FullName);
+            }
+
+            return errorAssetBundleInfos.Count == 0;
         }
 
         public static string GetMD5HashFromFile(string filePath)

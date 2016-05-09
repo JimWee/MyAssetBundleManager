@@ -66,12 +66,12 @@ namespace AssetBundles
 
             BuildPipeline.BuildAssetBundles(outputPath, builds.ToArray(), BuildAssetBundleOptions.DisableWriteTypeTree | BuildAssetBundleOptions.ChunkBasedCompression, EditorUserBuildSettings.activeBuildTarget);
 
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new StringBuilder(DateTime.Now.ToString("yyyyMMddHHmmss"));
             for (int i = 0; i < paths.Count; i++)
             {
                 string path = paths[i];
                 FileStream fs = new FileStream(Path.Combine(outputPath, path), FileMode.Open);
-                sb.AppendFormat("{0}\t{1}\t{2}\n", path, AssetBundleUtility.GetMD5HashFromFileStream(fs), fs.Length);
+                sb.AppendFormat("\n{0}\t{1}\t{2}", path, AssetBundleUtility.GetMD5HashFromFileStream(fs), fs.Length);
                 fs.Close();
                 EditorUtility.DisplayProgressBar("Compute MD5", string.Format("{0}/{1}  {2}", i + 1, paths.Count, path), (i + 1) / (float)paths.Count);
             }            
@@ -112,9 +112,10 @@ namespace AssetBundles
 
             //获取最新AssetBundle文件信息
             string error = string.Empty;
+            string versionID;
             Dictionary<string, AssetBundleInfo> assetBundleInfos = new Dictionary<string, AssetBundleInfo>();
             byte[] bytes = File.ReadAllBytes(Path.Combine(assetBundlesOutputPath, AssetBundleUtility.VersionFileName));            
-            if (!AssetBundleUtility.ResolveDecryptedVersionData(bytes, ref assetBundleInfos, out error))
+            if (!AssetBundleUtility.ResolveDecryptedVersionData(bytes, ref assetBundleInfos, out versionID, out error))
             {
                 Debug.LogError("resolve version file failed: " + error);
                 return;

@@ -27,6 +27,20 @@ namespace AssetBundles
 
         public static UnityWebRequest CurrentRequest = null;
 
+        public static string ResourceVersionID
+        {
+            get
+            {
+                return PlayerPrefs.GetString("ResourceVersionID", "");
+            }
+
+            set
+            {
+                PlayerPrefs.SetString("ResourceVersionID", value);
+                PlayerPrefs.Save();
+            }
+        }
+
         /// <summary>
         /// 设置更新地址
         /// </summary>
@@ -48,7 +62,8 @@ namespace AssetBundles
             string filePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName);
             if (!File.Exists(filePath)) return -1;
             string error = null;
-            if (!AssetBundleUtility.ResolveEncryptedVersionData(File.ReadAllBytes(filePath), ref LocalAssetBundleInfos, out error))
+            string versionID;
+            if (!AssetBundleUtility.ResolveEncryptedVersionData(File.ReadAllBytes(filePath), ref LocalAssetBundleInfos, out versionID, out error))
             {
                 Debug.LogError("解析本地版本文件失败：" + error);
                 return -2;
@@ -90,6 +105,9 @@ namespace AssetBundles
                     DowloadAssetBundleInfos.Add(item.Key, item.Value);
                 }
             }
+
+            FilterDownloadAssetBundleInfos();
+
             return;
         }
 
@@ -104,7 +122,7 @@ namespace AssetBundles
                 foreach (var item in DowloadAssetBundleInfos)
                 {
                     string path = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, item.Value.MD5);
-                    if (File.Exists(path))
+                    if (File.Exists(path) && AssetBundleUtility.GetMD5HashFromFile(path) == item.Value.MD5)
                     {
                         itemToRemove.Add(item.Key);
                     }
@@ -121,14 +139,14 @@ namespace AssetBundles
         /// </summary>
         /// <param name="count"></param>
         /// <param name="size"></param>
-        public static void GetDowloadInfo(out int count, out float size)
+        public static void GetDowloadInfo(Dictionary<string, AssetBundleInfo> assetBundleInfos, out int count, out float size)
         {
             count = 0;
             size = 0;
-            if (DowloadAssetBundleInfos != null)
+            if (assetBundleInfos != null)
             {
-                count = DowloadAssetBundleInfos.Count;
-                foreach (var item in DowloadAssetBundleInfos)
+                count = assetBundleInfos.Count;
+                foreach (var item in assetBundleInfos)
                 {
                     size += item.Value.Size;
                 }

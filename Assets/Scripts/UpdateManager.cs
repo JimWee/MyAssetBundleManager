@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using AssetBundles;
@@ -12,6 +13,7 @@ public class UpdateManager : MonoBehaviour
     public GameObject UIPopMsg;
     public GameObject UIProgressBar;
     public GameObject UIBottomMsg;
+    public GameObject UIResourcesVersion;
 
     GameObject mCube;
     string mFileName = string.Empty;
@@ -37,17 +39,24 @@ public class UpdateManager : MonoBehaviour
         if (AssetBundleUtility.SimulateAssetBundleInEditor)
         {
             yield break;
-        }        
+        }
 #endif
+
+        if (!Directory.Exists(AssetBundleUtility.LocalAssetBundlePath))
+        {
+            Directory.CreateDirectory(AssetBundleUtility.LocalAssetBundlePath);
+        }
 
         AssetBundleUpdate.SetSourceAssetBundleURL(URL);
 
         //检查本地是否存在version文件
         if (AssetBundleUpdate.ResolveLocalVersionFile() < 0)//没有本地版本文件信息
         {
+            bool downloadResourcesPack = false;
             string zipFilePath = Path.Combine(Application.streamingAssetsPath, AssetBundleUtility.ZipFileName);
             if (!File.Exists(zipFilePath))//android下会有问题
             {
+                downloadResourcesPack = true;
                 SetBottomMsg("首次运行游戏，下载游戏资源包");
                 yield return StartCoroutine(AssetBundleUpdate.GetRemoteFileInfo(AssetBundleUtility.ZipFileName, OnGetRemoteFileInfo));
                 if (CheckError()) yield break;
@@ -78,6 +87,11 @@ public class UpdateManager : MonoBehaviour
                 SetBottomMsg(string.Format("解压资源失败：{0}", res));
                 yield break;
             }
+
+            if (downloadResourcesPack)
+            {
+                File.Delete(zipFilePath);
+            }
         }
 
 
@@ -92,19 +106,19 @@ public class UpdateManager : MonoBehaviour
             yield break;
         }
 
-        //解析服务器version文件        
-        if (!AssetBundleUtility.ResolveEncryptedVersionData(wwwVersion.bytes, ref AssetBundleUpdate.ServerAssetBundleInfos, out mError))
+        //解析服务器version文件
+        string versionID;        
+        if (!AssetBundleUtility.ResolveEncryptedVersionData(wwwVersion.bytes, ref AssetBundleUpdate.ServerAssetBundleInfos, out versionID, out mError))
         {
             Debug.Log(mError);
             yield break;
         }
 
         //比较版本信息，确定下载文件
+        AssetBundleUpdate.SetDownloadAssetBundleInfos();
         int assetBundlesCount = 0;
         float assetBundlesSize = 0;
-        AssetBundleUpdate.SetDownloadAssetBundleInfos();
-        AssetBundleUpdate.FilterDownloadAssetBundleInfos();
-        AssetBundleUpdate.GetDowloadInfo(out assetBundlesCount, out assetBundlesSize);
+        AssetBundleUpdate.GetDowloadInfo(AssetBundleUpdate.DowloadAssetBundleInfos, out assetBundlesCount, out assetBundlesSize);
 
         Debug.Log(string.Format("更新文件{0}个，大小{1:F}MB", assetBundlesCount, assetBundlesSize / (1024 * 1024)));
 
@@ -124,9 +138,21 @@ public class UpdateManager : MonoBehaviour
 
         //保存version文件
         File.WriteAllBytes(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName), wwwVersion.bytes);
+        AssetBundleUpdate.ResourceVersionID = versionID;
+        SetResourcesVersion(versionID);
 
         SetBottomMsg("更新完成");
         AssetBundleUpdate.Clear();
+
+        //检查资源完整性
+        SetBottomMsg("检查资源完整性");
+        Dictionary<string, AssetBundleInfo> errorAssetBundleInfos;
+        if (!AssetBundleUtility.CheckLocalAssetBundles(true, out errorAssetBundleInfos))
+        {
+            SetBottomMsg("资源不完整");
+            AssetBundleUtility.PrintAssetBundleInfos(errorAssetBundleInfos);
+            yield break;
+        }
 
         //加载AssetBundleLoader
         SetBottomMsg("初始化资源");
@@ -152,6 +178,12 @@ public class UpdateManager : MonoBehaviour
         Debug.Log(text);
         Text textCpt = UIBottomMsg.GetComponent<Text>();
         textCpt.text = text;
+    }
+
+    void SetResourcesVersion(string version)
+    {
+        Text textCpt = UIResourcesVersion.GetComponent<Text>();
+        textCpt.text = version;
     }
 
     void UpdateProgress(float value)

@@ -57,8 +57,9 @@ namespace AssetBundles
 
             //解析version文件
             string error = "";
+            string versionID;
             byte[] versionBytes = File.ReadAllBytes(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName));
-            if (!AssetBundleUtility.ResolveEncryptedVersionData(versionBytes, ref mAssetBundleInfos, out error))
+            if (!AssetBundleUtility.ResolveEncryptedVersionData(versionBytes, ref mAssetBundleInfos, out versionID, out error))
             {
                 Debug.LogErrorFormat("resolve version file failed: {0}", error);
                 yield break;
