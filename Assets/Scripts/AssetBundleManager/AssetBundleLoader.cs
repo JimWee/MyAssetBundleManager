@@ -3,13 +3,14 @@ using UnityEngine.SceneManagement;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
 namespace AssetBundles
 {
-    public delegate void OnLoadAssetFinished(Object asset);
+    public delegate void OnLoadAssetFinished(UnityEngine.Object asset);
 
     public class LoadedAssetBundle
     {
@@ -57,7 +58,7 @@ namespace AssetBundles
 
             //解析version文件
             string error = "";
-            string versionID;
+            Int64 versionID;
             byte[] versionBytes = File.ReadAllBytes(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName));
             if (!AssetBundleUtility.ResolveEncryptedVersionData(versionBytes, ref mAssetBundleInfos, out versionID, out error))
             {
@@ -74,7 +75,7 @@ namespace AssetBundles
             bundleRequest.assetBundle.Unload(false);
         }
 
-        public Object LoadAsset(string assetPath)
+        public UnityEngine.Object LoadAsset(string assetPath)
         {
 #if UNITY_EDITOR
             if (AssetBundleUtility.SimulateAssetBundleInEditor)
@@ -92,7 +93,7 @@ namespace AssetBundles
 #if UNITY_EDITOR
             if (AssetBundleUtility.SimulateAssetBundleInEditor)
             {
-                Object asset = AssetDatabase.LoadMainAssetAtPath(Path.Combine(AssetBundleUtility.AssetBundleResourcesPath, assetPath) + ".prefab");
+                UnityEngine.Object asset = AssetDatabase.LoadMainAssetAtPath(Path.Combine(AssetBundleUtility.AssetBundleResourcesPath, assetPath) + ".prefab");
                 onLoadAssetFinished(asset);
                 yield break;
             }

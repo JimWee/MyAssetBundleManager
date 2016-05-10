@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using System.IO;
 using UnityEngine.Experimental.Networking;
 
@@ -10,6 +11,14 @@ namespace AssetBundles
     public struct AssetBundleInfo
     {
         public string AssetBundleName;
+        public string MD5;
+        public int Size;
+    }
+
+    public struct PatchesInfo
+    {
+        public Int64 From;
+        public Int64 To;
         public string MD5;
         public int Size;
     }
@@ -27,19 +36,7 @@ namespace AssetBundles
 
         public static UnityWebRequest CurrentRequest = null;
 
-        public static string ResourceVersionID
-        {
-            get
-            {
-                return PlayerPrefs.GetString("ResourceVersionID", "");
-            }
-
-            set
-            {
-                PlayerPrefs.SetString("ResourceVersionID", value);
-                PlayerPrefs.Save();
-            }
-        }
+        public static Int64 ResourcesVersionID;
 
         /// <summary>
         /// 设置更新地址
@@ -50,27 +47,33 @@ namespace AssetBundles
             BaseDownloadingURL = absolutePath + AssetBundleUtility.GetPlatformName() + "/";
         }
 
-        /// <summary>
-        /// 解析本地version文件
-        /// </summary>
-        /// <returns>
-        /// -1 = 本地version文件不存在
-        /// -2 = 解析version文件失败
-        /// </returns>
-        public static int ResolveLocalVersionFile()
-        {
-            string filePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName);
-            if (!File.Exists(filePath)) return -1;
-            string error = null;
-            string versionID;
-            if (!AssetBundleUtility.ResolveEncryptedVersionData(File.ReadAllBytes(filePath), ref LocalAssetBundleInfos, out versionID, out error))
-            {
-                Debug.LogError("解析本地版本文件失败：" + error);
-                return -2;
-            }
-            return 0;
-        } 
 
+        public static bool ResolvePatchesList(byte[] bytes, out List<PatchesInfo> patchesInfos, out string error)
+        {
+            patchesInfos = new List<PatchesInfo>();
+            try
+            {                
+                string text = Encoding.UTF8.GetString(bytes);
+                string[] items = text.Split('\n');
+                foreach (var item in items)
+                {
+                    string[] infos = item.Split('\t');
+                    PatchesInfo patchesInfo;
+                    patchesInfo.From = Convert.ToInt64(infos[0]);
+                    patchesInfo.To = Convert.ToInt64(infos[1]);
+                    patchesInfo.MD5 = infos[2];
+                    patchesInfo.Size = Convert.ToInt32(infos[3]);
+                    patchesInfos.Add(patchesInfo);
+                }
+                error = null;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = string.Format("Failed resolving patchesList: {0}", ex.ToString());
+                return false;
+            }
+        }
 
         /// <summary>
         /// 比较本地和服务器version文件，确定需要下载的文件（新文件和MD5改变的文件）

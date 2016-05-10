@@ -14,7 +14,6 @@ namespace AssetBundles
         public const string AssetBundlesOutputPath = "AssetBundles";
         public const string PatchesOutputPath = "Patches";
         public const string ChangeLogFileName = "ChangeLog.txt";
-        public static string ZipFileOutputPath = Application.streamingAssetsPath;
         public const int LevelOfCompression = 9; //(0-10)
 
         const string kSimulationMode = "AssetBundles/Simulation Mode";
@@ -93,26 +92,46 @@ namespace AssetBundles
         [MenuItem("AssetBundles/Update Resources Files")]
         static public void UpdateResourcesFiles()
         {
-            string patchesOutputPath = Path.Combine(PatchesOutputPath, AssetBundleUtility.GetPlatformName());
+            string patchesOutputPathPlatform = Path.Combine(PatchesOutputPath, AssetBundleUtility.GetPlatformName());
+            string resourcesOutputPath = Path.Combine(patchesOutputPathPlatform, AssetBundleUtility.ResourcesFolderName);
             string assetBundlesOutputPath = Path.Combine(AssetBundlesOutputPath, AssetBundleUtility.GetPlatformName());
 
-            if (!Directory.Exists(patchesOutputPath))
+            if (!Directory.Exists(resourcesOutputPath))
             {
-                Directory.CreateDirectory(patchesOutputPath);
+                Directory.CreateDirectory(resourcesOutputPath);
             }
 
             //获取资源目录下现有文件列表
-            DirectoryInfo dirInfo = new DirectoryInfo(patchesOutputPath);
+            DirectoryInfo dirInfo = new DirectoryInfo(resourcesOutputPath);
             FileInfo[] fileInfos = dirInfo.GetFiles();
             Dictionary<string, FileInfo> files = new Dictionary<string, FileInfo>();
             foreach (var item in fileInfos)
             {
                 files.Add(item.Name, item);
             }
+            if (files.ContainsKey(AssetBundleUtility.VersionFileName))
+            {
+                files.Remove(AssetBundleUtility.VersionFileName);
+            }
+            
+            string error = string.Empty;
+
+            //获取现有文件的资源版本
+            Int64 versionIDOld = 0;
+            string oldVersionFilePath = Path.Combine(resourcesOutputPath, AssetBundleUtility.VersionFileName);
+            if (File.Exists(oldVersionFilePath))
+            {
+                Dictionary<string, AssetBundleInfo> assetBundleInfosOld = new Dictionary<string, AssetBundleInfo>();
+                byte[] bytesOld = File.ReadAllBytes(oldVersionFilePath);
+                if (!AssetBundleUtility.ResolveEncryptedVersionData(bytesOld, ref assetBundleInfosOld, out versionIDOld, out error))
+                {
+                    Debug.LogError("resolve old version file failed: " + error);
+                    return;
+                }
+            }
 
             //获取最新AssetBundle文件信息
-            string error = string.Empty;
-            string versionID;
+            Int64 versionID;
             Dictionary<string, AssetBundleInfo> assetBundleInfos = new Dictionary<string, AssetBundleInfo>();
             byte[] bytes = File.ReadAllBytes(Path.Combine(assetBundlesOutputPath, AssetBundleUtility.VersionFileName));            
             if (!AssetBundleUtility.ResolveDecryptedVersionData(bytes, ref assetBundleInfos, out versionID, out error))
@@ -121,9 +140,11 @@ namespace AssetBundles
                 return;
             }
 
-            StringBuilder keepFilesSB = new StringBuilder("Keep Files:\n");
+            //StringBuilder keepFilesSB = new StringBuilder("Keep Files:\n");
             StringBuilder addFilesSB = new StringBuilder("Add Files:\n");
             StringBuilder deleteFilesSB = new StringBuilder("Delet Files:\n");
+
+            List<AssetBundleInfo> addFiles = new List<AssetBundleInfo>();
 
             int index = 0;
             foreach (var item in assetBundleInfos)
@@ -132,12 +153,13 @@ namespace AssetBundles
                 if (files.ContainsKey(item.Value.MD5))//已有文件
                 {
                     files.Remove(item.Value.MD5);
-                    keepFilesSB.AppendFormat("{0}\t{1}\n", item.Key, item.Value.MD5);
+                    //keepFilesSB.AppendFormat("\t{0}\t{1}\n", item.Key, item.Value.MD5);
                 }
                 else//新文件
                 {
-                    File.Copy(Path.Combine(assetBundlesOutputPath, item.Key), Path.Combine(patchesOutputPath, item.Value.MD5), true);
-                    addFilesSB.AppendFormat("{0}\t{1}\n", item.Key, item.Value.MD5);
+                    File.Copy(Path.Combine(assetBundlesOutputPath, item.Key), Path.Combine(resourcesOutputPath, item.Value.MD5), true);
+                    addFiles.Add(item.Value);
+                    addFilesSB.AppendFormat("\t{0}\t{1}\n", item.Key, item.Value.MD5);
                 }
                 EditorUtility.DisplayProgressBar("Copy New File", string.Format("{0}/{1}  {2}", index, assetBundleInfos.Count, item.Value.MD5), index / (float)assetBundleInfos.Count);
             }
@@ -147,37 +169,76 @@ namespace AssetBundles
             {
                 index++;
                 File.Delete(item.Value.FullName);
-                deleteFilesSB.AppendLine(item.Key);
+                deleteFilesSB.AppendFormat("\t{0}\n", item.Key);
                 EditorUtility.DisplayProgressBar("Delete Old File", string.Format("{0}/{1}  {2}", index, files.Count, item.Value.Name), index / (float)files.Count);
             }
 
-            //写入version文件
-            File.WriteAllBytes(Path.Combine(patchesOutputPath, AssetBundleUtility.VersionFileName), AssetBundleUtility.Encrypt(bytes, AssetBundleUtility.SecretKey));
+            string hintText = "Already up-to-date";
 
-            //changelog
-            File.WriteAllBytes(Path.Combine(PatchesOutputPath, AssetBundleUtility.GetPlatformName() + ChangeLogFileName), Encoding.UTF8.GetBytes(keepFilesSB.ToString() + addFilesSB.ToString() + deleteFilesSB.ToString()));
+            //有增加文件或删除文件，则认为文件有变动
+            if (addFiles.Count > 0 || files.Count > 0)
+            {
+                //写入version文件
+                File.WriteAllBytes(Path.Combine(resourcesOutputPath, AssetBundleUtility.VersionFileName), AssetBundleUtility.Encrypt(bytes, AssetBundleUtility.SecretKey));
+
+                //生成补丁包
+                string pathFileName = Path.Combine(patchesOutputPathPlatform, string.Format("{0}-{1}.zip", versionIDOld, versionID));
+                index = 0;
+                foreach (var item in addFiles)
+                {
+                    index++;
+                    EditorUtility.DisplayProgressBar("Build Patch File", string.Format("{0}/{1}  {2}", index, addFiles.Count, item.MD5), index / (float)addFiles.Count);
+                    int res = lzip.compress_File(LevelOfCompression, pathFileName, Path.Combine(resourcesOutputPath, item.MD5), true);
+                    if (res < 0)
+                    {
+                        EditorUtility.DisplayDialog("Update Resources Files", string.Format("Compression Failed - fileName: {0}, errorCode: {1}", item.MD5, res), "OK");
+                        return;
+                    }
+                }
+                int res1 = lzip.compress_File(LevelOfCompression, pathFileName, Path.Combine(resourcesOutputPath, AssetBundleUtility.VersionFileName), true);
+                if (res1 < 0)
+                {
+                    EditorUtility.DisplayDialog("Update Resources Files", string.Format("Compression Failed - fileName: {0}, errorCode: {1}", AssetBundleUtility.VersionFileName, res1), "OK");
+                    return;
+                }
+
+                //patchList
+                string patchFileMD5 = AssetBundleUtility.GetMD5HashFromFile(pathFileName);
+                long patchFileSize = new FileInfo(pathFileName).Length;
+                File.AppendAllText(Path.Combine(patchesOutputPathPlatform, AssetBundleUtility.PatchListFileName),
+                    string.Format("{0}\t{1}\t{2}\t{3}\n", versionIDOld, versionID, patchFileMD5, patchFileSize));
+
+                //changelog
+                string changeLog = string.Format("Version.{0} - Version.{1}\n\n{2}{3}\n\n\n", versionIDOld, versionID, addFilesSB.ToString(), deleteFilesSB.ToString());
+                File.AppendAllText(Path.Combine(patchesOutputPathPlatform, ChangeLogFileName), changeLog, Encoding.UTF8);
+
+                hintText = string.Format("Update Success: {0}", pathFileName);
+            }
 
             EditorUtility.ClearProgressBar();
-            if(!EditorUtility.DisplayDialog("Update Resources Files", "Update Success!", "OK", "Open Contain Folder"))
+            if(!EditorUtility.DisplayDialog("Update Resources Files", hintText, "OK", "Open Contain Folder"))
             {
-                System.Diagnostics.Process.Start("explorer.exe", "/select," + Path.GetFullPath(patchesOutputPath));
+                System.Diagnostics.Process.Start("explorer.exe", "/select," + Path.GetFullPath(patchesOutputPathPlatform));
             }
         }
 
         [MenuItem("AssetBundles/Build Resources Zip")]
         static void BuildResourcesZip()
         {
-            string inputPath = Path.Combine(PatchesOutputPath, AssetBundleUtility.GetPlatformName());
-            string outputFileName = Path.Combine(inputPath, AssetBundleUtility.ZipFileName);
+            string outputPath = Path.Combine(PatchesOutputPath, AssetBundleUtility.GetPlatformName());
+            string inputPath = Path.Combine(outputPath, AssetBundleUtility.ResourcesFolderName);            
 
-            if (!Directory.Exists(ZipFileOutputPath))
+            //获取资源版本号
+            string error;
+            Int64 versionID;
+            Dictionary<string, AssetBundleInfo> assetBundleInfos = new Dictionary<string, AssetBundleInfo>();
+            byte[] bytes = File.ReadAllBytes(Path.Combine(inputPath, AssetBundleUtility.VersionFileName));
+            if (!AssetBundleUtility.ResolveEncryptedVersionData(bytes, ref assetBundleInfos, out versionID, out error))
             {
-                Directory.CreateDirectory(ZipFileOutputPath);
+                Debug.LogError("resolve version file failed: " + error);
+                return;
             }
-            if (File.Exists(outputFileName))
-            {
-                File.Delete(outputFileName);
-            }
+            string outputFileName = Path.Combine(outputPath, string.Format("{0}_{1}_{2}", AssetBundleUtility.GetPlatformName(), AssetBundleUtility.ZipFileName, versionID));
 
             int progress = 0;
             DirectoryInfo dirInfo = new DirectoryInfo(inputPath);

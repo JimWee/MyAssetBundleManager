@@ -38,10 +38,11 @@ namespace AssetBundles
         public const string AssetBundleResourcesPath = "Assets/AssetBundleResources";
 #endif
         public static string LocalAssetBundlePath = Application.persistentDataPath + "/Patches";
+        public static string ResourcesFolderName = "Resources";
         public static string VersionFileName = "version";
         public static string ZipFileName = "Resources.zip";
+        public static string PatchListFileName = "PatchesList.txt";
         public static string SecretKey = "12345678";
-
 
         /// <summary>
         /// 打印Dictionary<string, AssetBundleInfo>内容
@@ -67,7 +68,7 @@ namespace AssetBundles
         /// <param name="assetBundleInfos"></param>
         /// <param name="error"></param>
         /// <returns></returns>
-        public static bool ResolveEncryptedVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out string versionID, out string error)
+        public static bool ResolveEncryptedVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out Int64 versionID, out string error)
         {
             return ResolveDecryptedVersionData(Decrypt(bytes, SecretKey), ref assetBundleInfos, out versionID, out error);
         }
@@ -80,7 +81,7 @@ namespace AssetBundles
         /// <param name="assetBundleInfos"></param>
         /// <param name="error"></param>
         /// <returns></returns>
-        public static bool ResolveDecryptedVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out string versionID, out string error)
+        public static bool ResolveDecryptedVersionData(byte[] bytes, ref Dictionary<string, AssetBundleInfo> assetBundleInfos, out Int64 versionID, out string error)
         {
             try
             {
@@ -95,7 +96,7 @@ namespace AssetBundles
                 }
                 string text = Encoding.UTF8.GetString(bytes);
                 string[] items = text.Split('\n');
-                versionID = items[0];
+                versionID = Convert.ToInt64(items[0]);
                 foreach (var item in items)
                 {
                     string[] infos = item.Split('\t');
@@ -114,7 +115,7 @@ namespace AssetBundles
             catch (Exception ex)
             {
                 error = string.Format("Failed resolving version data: {0}", ex.ToString());
-                versionID = null;
+                versionID = 0;
                 return false;
             }
         }
@@ -137,7 +138,7 @@ namespace AssetBundles
             }
 
             string error;
-            string versionID;
+            Int64 versionID;
             Dictionary<string, AssetBundleInfo> assetBundleInfos = new Dictionary<string, AssetBundleInfo>();
             if (!ResolveEncryptedVersionData(File.ReadAllBytes(versionFilePath), ref assetBundleInfos, out versionID, out error))
             {
