@@ -28,7 +28,9 @@ namespace AssetBundles
 
     public class AssetBundleUpdate
     {
-        
+        public const int MB= 1024 * 1024;
+        public const int KB = 1024;
+
         public static string BaseDownloadingURL = "";
         public static Dictionary<string, AssetBundleInfo> LocalAssetBundleInfos = null;
         public static Dictionary<string, AssetBundleInfo> ServerAssetBundleInfos = null;
@@ -47,6 +49,18 @@ namespace AssetBundles
             BaseDownloadingURL = absolutePath + AssetBundleUtility.GetPlatformName() + "/";
         }
 
+        public static string GetSizeString(long byteLength)
+        {
+            if (byteLength >= MB)
+            {
+                return string.Format("{0:F}MB", (float)byteLength / MB);
+            }
+            if (byteLength >= KB)
+            {
+                return string.Format("{0:F}KB", (float)byteLength / KB);
+            }
+            return string.Format("{0:F}B", (float)byteLength);
+        }
 
         public static bool ResolvePatchesList(byte[] bytes, out List<PatchesInfo> patchesInfos, out string error)
         {
@@ -58,12 +72,15 @@ namespace AssetBundles
                 foreach (var item in items)
                 {
                     string[] infos = item.Split('\t');
-                    PatchesInfo patchesInfo;
-                    patchesInfo.From = Convert.ToInt64(infos[0]);
-                    patchesInfo.To = Convert.ToInt64(infos[1]);
-                    patchesInfo.MD5 = infos[2];
-                    patchesInfo.Size = Convert.ToInt32(infos[3]);
-                    patchesInfos.Add(patchesInfo);
+                    if (infos != null && infos.Length == 4)
+                    {
+                        PatchesInfo patchesInfo;
+                        patchesInfo.From = Convert.ToInt64(infos[0]);
+                        patchesInfo.To = Convert.ToInt64(infos[1]);
+                        patchesInfo.MD5 = infos[2];
+                        patchesInfo.Size = Convert.ToInt32(infos[3]);
+                        patchesInfos.Add(patchesInfo);
+                    }
                 }
                 error = null;
                 return true;

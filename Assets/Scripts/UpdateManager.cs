@@ -6,6 +6,7 @@ using System.IO;
 using System.Threading;
 using AssetBundles;
 using System;
+using UnityEngine.Experimental.Networking;
 
 public class UpdateManager : MonoBehaviour
 {
@@ -14,6 +15,12 @@ public class UpdateManager : MonoBehaviour
     public GameObject UIProgressBar;
     public GameObject UIBottomMsg;
     public GameObject UIResourcesVersion;
+
+    Text mBottomMsgTextCpt;
+    Text mProgressBarTextCpt;
+    Slider mProgressBarSliderCpt;
+
+    string mBottomMsgFormatString = string.Empty;
 
     GameObject mCube;
     string mFileName = string.Empty;
@@ -24,6 +31,8 @@ public class UpdateManager : MonoBehaviour
     bool mIsDecompressing = false;
     int mZipFileNumber = 0;
     int[] mDecompressProgress = new int[1];
+
+    delegate void ConfirmDelegate(bool isOk);
 
     /// <summary>
     /// 检查LocalAssetBundlePath路径下是否有VersionFileName文件
@@ -41,6 +50,10 @@ public class UpdateManager : MonoBehaviour
             yield break;
         }
 #endif
+
+        mBottomMsgTextCpt = UIBottomMsg.GetComponent<Text>();
+        mProgressBarTextCpt = UIProgressBar.transform.Find("Text").GetComponent<Text>();
+        mProgressBarSliderCpt = UIProgressBar.GetComponent<Slider>();
 
         if (!Directory.Exists(AssetBundleUtility.LocalAssetBundlePath))
         {
@@ -63,18 +76,21 @@ public class UpdateManager : MonoBehaviour
                 if (CheckError()) yield break;
 
                 mIsDownloading = true;
-                SetBottomMsg("下载游戏资源包    {0}");
+                mBottomMsgFormatString = "下载游戏资源包中...    {0}/s";
                 yield return StartCoroutine(AssetBundleUpdate.DownloadFile(AssetBundleUtility.ZipFileName, OnDownloadFileFinidhed, FileMode.Append, mFileSize, mLastModified));                
                 if (CheckError()) yield break;
                 UpdateProgress(1.0f);
+                yield return null;
                 mIsDownloading = false;
 
                 zipFilePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.ZipFileName);             
             }
-            SetBottomMsg("解压游戏资源包");
 
+            SetBottomMsg("解压游戏资源包");
             mZipFileNumber = lzip.getTotalFiles(zipFilePath);
+            mDecompressProgress[0] = 0;
             mIsDecompressing = true;
+            yield return null;
             int res = 0;
             Thread th = new Thread
                 (() =>
@@ -85,13 +101,15 @@ public class UpdateManager : MonoBehaviour
             th.Start();
             while (mIsDecompressing)
             {
-                yield return new WaitForSeconds(1);
+                yield return null;
             }
             if (res < 0)
             {
                 SetBottomMsg(string.Format("解压资源失败：{0}", res));
                 yield break;
             }
+            UpdateProgress(1.0f);
+            yield return null;
 
             if (downloadResourcesPack)
             {
@@ -138,17 +156,54 @@ public class UpdateManager : MonoBehaviour
             }
         }
 
+        //计算下载文件数量和大小
+        int patchesCount = 0;
+        int patchesSize = 0;
+        for (int i = patchesIndex; i < patchesInfos.Count; i++)
+        {
+            patchesCount++;
+            patchesSize += patchesInfos[i].Size;
+        }
+
+        if (patchesCount > 0)
+        {
+            //确认下载
+            bool waitForConfirm = true;
+            bool continueDownload = false;
+            DisplayDialog(string.Format("更新文件数量 {0}个，更新文件大小 {1}", 
+                patchesCount, AssetBundleUpdate.GetSizeString(patchesSize)), 
+                (bool isOk) => { waitForConfirm = false; continueDownload = isOk; });
+            while (waitForConfirm)
+            {
+                yield return null;
+            }
+            if (!continueDownload)
+            {
+                yield break;
+            }
+        }
+
+        int currentPatchesCount = 0;
         for (; patchesIndex < patchesInfos.Count; patchesIndex++)
         {
+            mBottomMsgFormatString =  string.Format("下载文件中({0}/{1})...  ", ++currentPatchesCount, patchesCount) + "{0}/s";
             PatchesInfo patchesInfo = patchesInfos[patchesIndex];
             string fileName = string.Format("{0}-{1}.zip", patchesInfo.From, patchesInfo.To);
             mIsDownloading = true;
+            yield return null;
             yield return AssetBundleUpdate.DownloadFile(fileName, OnDownloadFileFinidhed);
-            mIsDownloading = false;
             if (CheckError()) yield break;
+            UpdateProgress(1.0f);
+            yield return null;
+            mIsDownloading = false;
 
+            SetBottomMsg("解压文件");
             string zipFilePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, fileName);
-            mIsDecompressing = true;
+            mZipFileNumber = lzip.getTotalFiles(zipFilePath);
+            mDecompressProgress[0] = 0;
+            mIsDecompressing = true;            
+            yield return null;
+
             int res = 0;
             Thread th = new Thread
                 (() =>
@@ -159,65 +214,17 @@ public class UpdateManager : MonoBehaviour
             th.Start();
             while (mIsDecompressing)
             {
-                yield return new WaitForSeconds(1);
+                yield return null;
             }
             if (res < 0)
             {
                 SetBottomMsg(string.Format("解压资源失败：{0}", res));
                 yield break;
             }
-
+            UpdateProgress(1.0f);
+            yield return null;
             File.Delete(zipFilePath);
         }
-
-        ////下载version文件
-        //SetBottomMsg("下载资源列表");
-        //WWW wwwVersion = new WWW(AssetBundleUpdate.BaseDownloadingURL + AssetBundleUtility.VersionFileName);
-        //yield return wwwVersion;
-        //if (wwwVersion.error != null)
-        //{
-        //    SetBottomMsg("下载资源列表失败");
-        //    Debug.LogErrorFormat("Version file download failed - url: {0}, error: {1}", wwwVersion.url, wwwVersion.error);
-        //    yield break;
-        //}
-
-        ////解析服务器version文件
-        //string versionID;        
-        //if (!AssetBundleUtility.ResolveEncryptedVersionData(wwwVersion.bytes, ref AssetBundleUpdate.ServerAssetBundleInfos, out versionID, out mError))
-        //{
-        //    Debug.Log(mError);
-        //    yield break;
-        //}
-
-        ////比较版本信息，确定下载文件
-        //AssetBundleUpdate.SetDownloadAssetBundleInfos();
-        //int assetBundlesCount = 0;
-        //float assetBundlesSize = 0;
-        //AssetBundleUpdate.GetDowloadInfo(AssetBundleUpdate.DowloadAssetBundleInfos, out assetBundlesCount, out assetBundlesSize);
-
-        //Debug.Log(string.Format("更新文件{0}个，大小{1:F}MB", assetBundlesCount, assetBundlesSize / (1024 * 1024)));
-
-        ////下载AssetBundles
-        //int downloadCount = 0;
-        //float downloadSize = 0;
-        //foreach (var item in AssetBundleUpdate.DowloadAssetBundleInfos)
-        //{
-        //    yield return StartCoroutine(AssetBundleUpdate.DownloadFile(item.Value.MD5, OnDownloadFileFinidhed));
-        //    if (CheckError()) yield break;
-        //    downloadCount++;
-        //    downloadSize += item.Value.Size;
-
-        //    SetBottomMsg(string.Format("数量：{0}/{1}  大小：{2:F}KB/{3:F}KB", downloadCount, assetBundlesCount, downloadSize / 1024, assetBundlesSize / 1024));
-        //    UpdateProgress(downloadSize / assetBundlesSize);
-        //}
-
-        ////保存version文件
-        //File.WriteAllBytes(Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName), wwwVersion.bytes);
-        //AssetBundleUpdate.ResourceVersionID = versionID;
-        //SetResourcesVersion(versionID);
-
-        //SetBottomMsg("更新完成");
-        //AssetBundleUpdate.Clear();
 
         //检查资源完整性
         SetBottomMsg("检查资源完整性");
@@ -241,6 +248,10 @@ public class UpdateManager : MonoBehaviour
         if (mIsDownloading)
         {
             UpdateProgress(AssetBundleUpdate.GetDownloadPorgress());
+            if (AssetBundleUpdate.CurrentRequest != null)
+            {
+                SetBottomMsgFormat(AssetBundleUpdate.GetSizeString(((DownloadHandlerFile)AssetBundleUpdate.CurrentRequest.downloadHandler).GetDownloadSpeed()));
+            }            
         }
         if (mIsDecompressing)
         {
@@ -251,8 +262,12 @@ public class UpdateManager : MonoBehaviour
     void SetBottomMsg(string text)
     {
         Debug.Log(text);
-        Text textCpt = UIBottomMsg.GetComponent<Text>();
-        textCpt.text = text;
+        mBottomMsgTextCpt.text = text;
+    }
+
+    void SetBottomMsgFormat(params object[] args)
+    {
+        mBottomMsgTextCpt.text = string.Format(mBottomMsgFormatString, args);
     }
 
     void SetResourcesVersion(Int64 version)
@@ -263,11 +278,16 @@ public class UpdateManager : MonoBehaviour
 
     void UpdateProgress(float value)
     {
-        Text textCpt = UIProgressBar.transform.Find("Text").GetComponent<Text>();
-        textCpt.text = string.Format("{0:F}%", value * 100);
+        mProgressBarTextCpt.text = string.Format("{0:F}%", value * 100);
+        mProgressBarSliderCpt.value = value;
+    }
 
-        Slider sliderCpt = UIProgressBar.GetComponent<Slider>();
-        sliderCpt.value = value;
+    void DisplayDialog(string content, ConfirmDelegate func)
+    {
+        UIPopMsg.SetActive(true);
+        UIPopMsg.transform.Find("Text").GetComponent<Text>().text = content;
+        UIPopMsg.transform.Find("OkBtn").GetComponent<Button>().onClick.AddListener(() => { UIPopMsg.SetActive(false); func(true); });
+        UIPopMsg.transform.Find("CancelBtn").GetComponent<Button>().onClick.AddListener(() => { UIPopMsg.SetActive(false); func(false); });
     }
 
     public void LoadCubeAsync()

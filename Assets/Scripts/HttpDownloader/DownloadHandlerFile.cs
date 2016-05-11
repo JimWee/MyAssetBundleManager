@@ -15,7 +15,7 @@ namespace UnityEngine.Experimental.Networking
         long mPreSize = 0;
         long mCurrentSize = 0;
         Timer mTimer;
-        float mDownloadSpeed = 0;
+        long mDownloadSpeed = 0;
 
         public DownloadHandlerFile(string filePath, FileMode fileMode = FileMode.Create) 
             : base()
@@ -36,6 +36,11 @@ namespace UnityEngine.Experimental.Networking
             {
                 mFileStream.Close();
             }
+            if (mTimer != null)
+            {
+                mTimer.Close();
+            }
+
         }
 
         private void Init(string filePath, FileMode fileMode)
@@ -107,7 +112,7 @@ namespace UnityEngine.Experimental.Networking
             mDownloadSpeed = 0;
         }
 
-        public float GetDownloadSpeed()
+        public long GetDownloadSpeed()
         {
             return mDownloadSpeed;
         }

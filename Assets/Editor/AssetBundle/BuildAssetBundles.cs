@@ -238,7 +238,7 @@ namespace AssetBundles
                 Debug.LogError("resolve version file failed: " + error);
                 return;
             }
-            string outputFileName = Path.Combine(outputPath, string.Format("{0}_{1}_{2}", AssetBundleUtility.GetPlatformName(), AssetBundleUtility.ZipFileName, versionID));
+            string outputFileName = Path.Combine(outputPath, string.Format("{0}_{1}}", AssetBundleUtility.ZipFileName, versionID));
 
             int progress = 0;
             DirectoryInfo dirInfo = new DirectoryInfo(inputPath);
