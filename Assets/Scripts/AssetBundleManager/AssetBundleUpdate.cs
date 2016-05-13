@@ -40,6 +40,21 @@ namespace AssetBundles
 
         public static Int64 ResourcesVersionID;
 
+        public static void Init(string URL)
+        {
+            SetSourceAssetBundleURL(URL);
+
+            if (!Directory.Exists(AssetBundleUtility.LocalAssetBundlePath))
+            {
+                Directory.CreateDirectory(AssetBundleUtility.LocalAssetBundlePath);
+            }
+
+#if UNITY_IOS
+            //防止资源被iCloud的备份
+            UnityEngine.iOS.Device.SetNoBackupFlag(AssetBundleUtility.LocalAssetBundlePath);
+#endif
+        }
+
         /// <summary>
         /// 设置更新地址
         /// </summary>

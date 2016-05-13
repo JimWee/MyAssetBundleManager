@@ -55,25 +55,42 @@ public class UpdateManager : MonoBehaviour
         mProgressBarTextCpt = UIProgressBar.transform.Find("Text").GetComponent<Text>();
         mProgressBarSliderCpt = UIProgressBar.GetComponent<Slider>();
 
-        if (!Directory.Exists(AssetBundleUtility.LocalAssetBundlePath))
-        {
-            Directory.CreateDirectory(AssetBundleUtility.LocalAssetBundlePath);
-        }
+        AssetBundleUpdate.Init(URL);
 
-        AssetBundleUpdate.SetSourceAssetBundleURL(URL);
         string localVersionFilePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.VersionFileName);
 
         //检查本地是否存在version文件
         if (!File.Exists(localVersionFilePath))//没有本地版本文件信息
         {
             bool downloadResourcesPack = false;
+#if UNITY_ANDROID
+            string zipFilePath = Path.Combine("assets/", AssetBundleUtility.ZipFileName);
+            if (lzip.getEntrySize(Application.dataPath, zipFilePath) <= 0)
+            {            
+#else
             string zipFilePath = Path.Combine(Application.streamingAssetsPath, AssetBundleUtility.ZipFileName);
-            if (!File.Exists(zipFilePath))//android下会有问题
+            if (!File.Exists(zipFilePath))
             {
-                downloadResourcesPack = true;
-                SetBottomMsg("首次运行游戏，下载游戏资源包");
+#endif
+                downloadResourcesPack = true;                
                 yield return StartCoroutine(AssetBundleUpdate.GetRemoteFileInfo(AssetBundleUtility.ZipFileName, OnGetRemoteFileInfo));
                 if (CheckError()) yield break;
+
+                SetBottomMsg("首次运行游戏，下载游戏资源包");
+
+                bool waitForConfirm = true;
+                bool continueDownload = false;
+                DisplayDialog(string.Format("需要下载{0}大小的游戏资源包",
+                    AssetBundleUpdate.GetSizeString(mFileSize)),
+                    (bool isOk) => { waitForConfirm = false; continueDownload = isOk; });
+                while (waitForConfirm)
+                {
+                    yield return null;
+                }
+                if (!continueDownload)
+                {
+                    yield break;
+                }
 
                 mIsDownloading = true;
                 mBottomMsgFormatString = "下载游戏资源包中...    {0}/s";
@@ -86,7 +103,43 @@ public class UpdateManager : MonoBehaviour
                 zipFilePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.ZipFileName);             
             }
 
-            SetBottomMsg("解压游戏资源包");
+#if UNITY_ANDROID
+            //将资源从apk包中解压到LocalAssetBundlePath
+            if (!downloadResourcesPack)
+            {
+                SetBottomMsg("提取游戏资源包...");
+                mZipFileNumber = 100;
+                mDecompressProgress[0] = 0;
+                mIsDecompressing = true;
+                yield return null;
+                int resAndroid = 0;
+                Thread thAndroid = new Thread
+                    (() =>
+                    {
+                        resAndroid = lzip.extract_entry(Application.dataPath, zipFilePath, Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.ZipFileName));
+                        mIsDecompressing = false;
+                    });
+                thAndroid.Start();
+                int timeCount = 0;
+                while (mIsDecompressing)
+                {
+                    mDecompressProgress[0] = Mathf.Min(timeCount++, mZipFileNumber);
+                    yield return new WaitForSeconds(0.5f);
+                }
+                if (resAndroid < 0)
+                {
+                    SetBottomMsg(string.Format("提取资源失败：{0}", resAndroid));
+                    yield break;
+                }
+                UpdateProgress(1.0f);
+                yield return null;
+
+                downloadResourcesPack = true;
+                zipFilePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, AssetBundleUtility.ZipFileName);
+            }
+#endif
+
+            SetBottomMsg("解压游戏资源包...");
             mZipFileNumber = lzip.getTotalFiles(zipFilePath);
             mDecompressProgress[0] = 0;
             mIsDecompressing = true;
@@ -197,7 +250,7 @@ public class UpdateManager : MonoBehaviour
             yield return null;
             mIsDownloading = false;
 
-            SetBottomMsg("解压文件");
+            SetBottomMsg("解压文件...");
             string zipFilePath = Path.Combine(AssetBundleUtility.LocalAssetBundlePath, fileName);
             mZipFileNumber = lzip.getTotalFiles(zipFilePath);
             mDecompressProgress[0] = 0;
@@ -253,10 +306,14 @@ public class UpdateManager : MonoBehaviour
                 SetBottomMsgFormat(AssetBundleUpdate.GetSizeString(((DownloadHandlerFile)AssetBundleUpdate.CurrentRequest.downloadHandler).GetDownloadSpeed()));
             }            
         }
-        if (mIsDecompressing)
+        else if (mIsDecompressing)
         {
             UpdateProgress(mDecompressProgress[0] / (float)mZipFileNumber);
         }
+        else
+        {
+            UIProgressBar.SetActive(false);
+        }        
     }
 
     void SetBottomMsg(string text)
@@ -278,6 +335,7 @@ public class UpdateManager : MonoBehaviour
 
     void UpdateProgress(float value)
     {
+        UIProgressBar.SetActive(true);
         mProgressBarTextCpt.text = string.Format("{0:F}%", value * 100);
         mProgressBarSliderCpt.value = value;
     }
@@ -313,12 +371,12 @@ public class UpdateManager : MonoBehaviour
 
     public void LoadScene()
     {
-        AssetBundleLoader.Instance.LoadScene("scene/Scene2");
+        AssetBundleLoader.Instance.LoadScene("Scene/Scene2");
     }
 
     public void LoadSceneAsync()
     {
-        StartCoroutine(AssetBundleLoader.Instance.LoadSceneAsync("scene/Scene2"));
+        StartCoroutine(AssetBundleLoader.Instance.LoadSceneAsync("Scene/Scene2"));
     }
 
     bool CheckError()

@@ -121,7 +121,16 @@ namespace AssetBundles
 #if UNITY_EDITOR
             if (AssetBundleUtility.SimulateAssetBundleInEditor)
             {
-                EditorApplication.LoadLevelAsyncInPlayMode(Path.Combine(AssetBundleUtility.AssetBundleResourcesPath, scenePath) + ".unity");
+                string path = Path.Combine(AssetBundleUtility.AssetBundleResourcesPath, scenePath) + ".unity";
+                if (mode == LoadSceneMode.Single)
+                {
+                    EditorApplication.LoadLevelInPlayMode(path);
+                    
+                }
+                else
+                {
+                    EditorApplication.LoadLevelAdditiveInPlayMode(path);
+                }
                 return;
             }
 #endif
@@ -131,8 +140,25 @@ namespace AssetBundles
 
         public IEnumerator LoadSceneAsync(string scenePath, LoadSceneMode mode = LoadSceneMode.Single)
         {
+#if UNITY_EDITOR
+            if (AssetBundleUtility.SimulateAssetBundleInEditor)
+            {
+                string path = Path.Combine(AssetBundleUtility.AssetBundleResourcesPath, scenePath) + ".unity";
+                if (mode == LoadSceneMode.Single)
+                {
+                    yield return EditorApplication.LoadLevelAsyncInPlayMode(path);
+
+                }
+                else
+                {
+                    yield return EditorApplication.LoadLevelAdditiveAsyncInPlayMode(path);
+                }
+                yield break;
+            }
+#endif
+
             yield return StartCoroutine(LoadAssetBundleWithDependenciesAsync(scenePath));
-            SceneManager.LoadSceneAsync(Path.GetFileName(scenePath), mode);
+            yield return SceneManager.LoadSceneAsync(Path.GetFileName(scenePath), mode);
         }
 
         public AssetBundle LoadAssetBundleWithDependencies(string assetBundleName)
