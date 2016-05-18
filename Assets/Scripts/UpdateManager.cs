@@ -350,12 +350,12 @@ public class UpdateManager : MonoBehaviour
 
     public void LoadCubeAsync()
     {
-        StartCoroutine(AssetBundleLoader.Instance.LoadAssetAsync("prefab/mycube", delegate (UnityEngine.Object asset) { mCube = Instantiate(asset) as GameObject; }));
+        StartCoroutine(AssetBundleLoader.Instance.LoadAssetAsync("prefabs/mycube", delegate (UnityEngine.Object asset) { mCube = Instantiate(asset) as GameObject; }));
     }
 
     public void LoadCube()
     {
-        mCube = Instantiate(AssetBundleLoader.Instance.LoadAsset("prefab/mycube")) as GameObject;
+        mCube = Instantiate(AssetBundleLoader.Instance.LoadAsset("prefabs/mycube")) as GameObject;
     }
 
     public void DestroyCube()
@@ -366,17 +366,17 @@ public class UpdateManager : MonoBehaviour
 
     public void UnloadCube()
     {
-        AssetBundleLoader.Instance.UnloadAsset("prefab/mycube");
+        AssetBundleLoader.Instance.UnloadAsset("prefabs/mycube");
     }
 
     public void LoadScene()
     {
-        AssetBundleLoader.Instance.LoadScene("Scene/Scene2");
+        AssetBundleLoader.Instance.LoadScene("Scenes/Scene2");
     }
 
     public void LoadSceneAsync()
     {
-        StartCoroutine(AssetBundleLoader.Instance.LoadSceneAsync("Scene/Scene2"));
+        StartCoroutine(AssetBundleLoader.Instance.LoadSceneAsync("Scenes/Scene2"));
     }
 
     bool CheckError()

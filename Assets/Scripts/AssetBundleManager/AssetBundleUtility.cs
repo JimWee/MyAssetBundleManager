@@ -36,6 +36,7 @@ namespace AssetBundles
             }
         }
         public const string AssetBundleResourcesPath = "Assets/AssetBundleResources";
+        public const string AssetBundleScenesPath = "Assets/AssetBundleScenes";
 #endif
         public static string LocalAssetBundlePath = Application.persistentDataPath + "/Patches";
         public static string ResourcesFolderName = "Resources";
@@ -55,7 +56,7 @@ namespace AssetBundles
                 StringBuilder sb = new StringBuilder("PrintAssetBundleInfos");
                 foreach (var item in assetBundleInfos)
                 {
-                    sb.AppendFormat("name: {}, MD5: {}, size: {}\n", item.Value.AssetBundleName, item.Value.MD5, item.Value.Size);
+                    sb.AppendFormat("name: {0}, MD5: {1}, size: {2}\n", item.Value.AssetBundleName, item.Value.MD5, item.Value.Size);
                 }
                 Debug.Log(sb.ToString());
             }
