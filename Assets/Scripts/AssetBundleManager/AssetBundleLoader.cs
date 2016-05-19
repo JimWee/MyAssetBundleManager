@@ -67,7 +67,7 @@ namespace AssetBundles
             }
 
             //加载Manifest
-            AssetBundleCreateRequest bundleRequest = AssetBundle.LoadFromFileAsync(AssetBundleName2FilePath(AssetBundleUtility.GetPlatformName()));
+            AssetBundleCreateRequest bundleRequest = AssetBundle.LoadFromFileAsync(AssetBundleName2FilePath(AssetBundleUtility.GetPlatformName() + AssetBundleUtility.AssetBundleExtension));
             yield return bundleRequest;
             AssetBundleRequest assetRequest = bundleRequest.assetBundle.LoadAssetAsync<AssetBundleManifest>("AssetBundleManifest");
             yield return assetRequest;
@@ -83,7 +83,7 @@ namespace AssetBundles
                 return AssetDatabase.LoadMainAssetAtPath(Path.Combine(AssetBundleUtility.AssetBundleResourcesPath, assetPath) + ".prefab");
             }
 #endif
-            AssetBundle bundle = LoadAssetBundleWithDependencies(assetPath);
+            AssetBundle bundle = LoadAssetBundleWithDependencies(assetPath + AssetBundleUtility.AssetBundleExtension);
             string assetName = Path.GetFileName(assetPath);
             return bundle.LoadAsset(assetName);
         }
@@ -98,8 +98,9 @@ namespace AssetBundles
                 yield break;
             }
 #endif
-            yield return StartCoroutine(LoadAssetBundleWithDependenciesAsync(assetPath));
-            AssetBundle bundle = mLoadedAssetBundles[assetPath].mAssetBundle;
+            string assetBundleName = assetPath + AssetBundleUtility.AssetBundleExtension;
+            yield return StartCoroutine(LoadAssetBundleWithDependenciesAsync(assetBundleName));
+            AssetBundle bundle = mLoadedAssetBundles[assetBundleName].mAssetBundle;
             string assetName = Path.GetFileName(assetPath);
             AssetBundleRequest assetRequest = bundle.LoadAssetAsync(assetName);
             yield return assetRequest;
@@ -134,7 +135,7 @@ namespace AssetBundles
                 return;
             }
 #endif
-            LoadAssetBundleWithDependencies(scenePath);
+            LoadAssetBundleWithDependencies(scenePath + AssetBundleUtility.AssetBundleExtension);
             SceneManager.LoadScene(Path.GetFileName(scenePath), mode);
         }
 
@@ -157,7 +158,7 @@ namespace AssetBundles
             }
 #endif
 
-            yield return StartCoroutine(LoadAssetBundleWithDependenciesAsync(scenePath));
+            yield return StartCoroutine(LoadAssetBundleWithDependenciesAsync(scenePath + AssetBundleUtility.AssetBundleExtension));
             yield return SceneManager.LoadSceneAsync(Path.GetFileName(scenePath), mode);
         }
 

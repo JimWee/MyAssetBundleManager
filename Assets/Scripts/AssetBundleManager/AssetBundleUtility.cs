@@ -36,7 +36,7 @@ namespace AssetBundles
             }
         }
         public const string AssetBundleResourcesPath = "Assets/AssetBundleResources";
-        public const string AssetBundleScenesPath = "Assets/AssetBundleScenes";
+        //public const string AssetBundleResourcesPath = "Assets/Test";
 #endif
         public static string LocalAssetBundlePath = Application.persistentDataPath + "/Patches";
         public static string ResourcesFolderName = "Resources";
@@ -44,6 +44,7 @@ namespace AssetBundles
         public static string ZipFileName = "Resources.zip";
         public static string PatchListFileName = "PatchesList.txt";
         public static string SecretKey = "12345678";
+        public static string AssetBundleExtension = ".ab";
 
         /// <summary>
         /// 打印Dictionary<string, AssetBundleInfo>内容

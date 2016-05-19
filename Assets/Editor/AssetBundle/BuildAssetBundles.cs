@@ -30,6 +30,17 @@ namespace AssetBundles
             return true;
         }
 
+        [MenuItem("AssetBundles/Build Test")]
+        static public void Test()
+        {
+            string outputPath = Path.Combine(AssetBundlesOutputPath, AssetBundleUtility.GetPlatformName());
+            if (!Directory.Exists(outputPath))
+            {
+                Directory.CreateDirectory(outputPath);
+            }
+            BuildPipeline.BuildAssetBundles(outputPath, BuildAssetBundleOptions.None, EditorUserBuildSettings.activeBuildTarget);
+        }
+
         [MenuItem("AssetBundles/Build AssetBundles")]
         static public void Build()
         {
@@ -40,30 +51,53 @@ namespace AssetBundles
             }
                 
             List<string> paths = new List<string>();
-            paths.Add(AssetBundleUtility.GetPlatformName());
+            paths.Add(AssetBundleUtility.GetPlatformName() + AssetBundleUtility.AssetBundleExtension);
 
             List<AssetBundleBuild> builds = new List<AssetBundleBuild>();
 
-            string[] lookFor = new string[] { AssetBundleUtility.AssetBundleResourcesPath };           
-            string[] guids = AssetDatabase.FindAssets("", lookFor);
-            foreach (var guid in guids)
+            //string[] lookFor = new string[] { AssetBundleUtility.AssetBundleResourcesPath };
+            //string[] guids = AssetDatabase.FindAssets("", lookFor);
+            //foreach (var guid in guids)
+            //{
+            //    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+            //    if (!AssetDatabase.IsValidFolder(assetPath))//排除文件夹
+            //    {
+            //        string assetBundleName = AssetPathToAssetBundleName(assetPath).ToLower();
+            //        paths.Add(assetBundleName);
+
+            //        AssetBundleBuild build = new AssetBundleBuild();
+            //        build.assetBundleName = assetBundleName;
+            //        build.assetNames = new string[] { assetPath };
+            //        builds.Add(build);
+            //        //Debug.Log(build.assetBundleName);
+            //        //Debug.Log(assetPath);
+            //    }
+            //}
+
+            DirectoryInfo dirInfo = new DirectoryInfo(AssetBundleUtility.AssetBundleResourcesPath);
+            FileInfo[] fileInfos = dirInfo.GetFiles("*", SearchOption.AllDirectories);
+            foreach (var item in fileInfos)
             {
-                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                if (!AssetDatabase.IsValidFolder(assetPath))//排除文件夹
+                if (Path.GetExtension(item.Name) != ".meta")
                 {
-                    string assetBundleName = AssetPathToAssetBundleName(assetPath).ToLower();
+                    string assetBundleName = FilePathToAssetBundleName(item.FullName).ToLower() + AssetBundleUtility.AssetBundleExtension;
                     paths.Add(assetBundleName);
 
                     AssetBundleBuild build = new AssetBundleBuild();
                     build.assetBundleName = assetBundleName;
-                    build.assetNames = new string[] { assetPath };
+                    build.assetNames = new string[] { FilePathToAssetName(item.FullName) };
                     builds.Add(build);
-                    //Debug.Log(build.assetBundleName);
-                    //Debug.Log(assetPath);
                 }
             }
-
             BuildPipeline.BuildAssetBundles(outputPath, builds.ToArray(), BuildAssetBundleOptions.DisableWriteTypeTree | BuildAssetBundleOptions.ChunkBasedCompression, EditorUserBuildSettings.activeBuildTarget);
+
+            string manifestFilePath = Path.Combine(outputPath, AssetBundleUtility.GetPlatformName());
+            string manifestFilePathRename = manifestFilePath + AssetBundleUtility.AssetBundleExtension;
+            if (File.Exists(manifestFilePathRename))
+            {
+                File.Delete(manifestFilePathRename);
+            }
+            File.Move(manifestFilePath, manifestFilePathRename);
 
             StringBuilder sb = new StringBuilder(DateTime.Now.ToString("yyyyMMddHHmmss"));
             for (int i = 0; i < paths.Count; i++)
@@ -87,6 +121,17 @@ namespace AssetBundles
         {     
             string assetbundleName = assetPath.Replace(AssetBundleUtility.AssetBundleResourcesPath + "/", "");
             return assetbundleName.Substring(0, assetbundleName.LastIndexOf('.'));            
+        }
+
+        static string FilePathToAssetBundleName(string filePath)
+        {
+            string assetBundleName = filePath.Replace(Path.GetFullPath(AssetBundleUtility.AssetBundleResourcesPath) + "\\", "");
+            return assetBundleName.Substring(0, assetBundleName.LastIndexOf('.')).Replace("\\", "/");
+        }
+
+        static string FilePathToAssetName(string filePath)
+        {
+            return filePath.Replace(Directory.GetCurrentDirectory() + "\\", "").Replace("\\", "/");
         }
 
         [MenuItem("AssetBundles/Update Resources Files")]
