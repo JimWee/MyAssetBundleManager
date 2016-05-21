@@ -15,6 +15,7 @@ public class UpdateManager : MonoBehaviour
     public GameObject UIProgressBar;
     public GameObject UIBottomMsg;
     public GameObject UIResourcesVersion;
+    public GameObject UIStartGameBtn;
 
     Text mBottomMsgTextCpt;
     Text mProgressBarTextCpt;
@@ -31,8 +32,15 @@ public class UpdateManager : MonoBehaviour
     bool mIsDecompressing = false;
     int mZipFileNumber = 0;
     int[] mDecompressProgress = new int[1];
+    AsyncOperation mLoadSceneAsyncOpe;
 
     delegate void ConfirmDelegate(bool isOk);
+
+    enum MyEnum
+    {
+        A = 0,
+        B = 1,
+    }
 
     /// <summary>
     /// 检查LocalAssetBundlePath路径下是否有VersionFileName文件
@@ -54,6 +62,7 @@ public class UpdateManager : MonoBehaviour
         mBottomMsgTextCpt = UIBottomMsg.GetComponent<Text>();
         mProgressBarTextCpt = UIProgressBar.transform.Find("Text").GetComponent<Text>();
         mProgressBarSliderCpt = UIProgressBar.GetComponent<Slider>();
+        UIStartGameBtn.SetActive(false);
 
         AssetBundleUpdate.Init(URL);
 
@@ -293,6 +302,8 @@ public class UpdateManager : MonoBehaviour
         SetBottomMsg("初始化资源");
         yield return StartCoroutine(AssetBundleLoader.Instance.Init());
         SetBottomMsg("初始化资源完成");
+
+        UIStartGameBtn.SetActive(true);
     }
 
     // Update is called once per frame
@@ -377,6 +388,11 @@ public class UpdateManager : MonoBehaviour
     public void LoadSceneAsync()
     {
         StartCoroutine(AssetBundleLoader.Instance.LoadSceneAsync("Scenes/Scene2"));
+    }
+
+    public void StartGame()
+    {
+        StartCoroutine(AssetBundleLoader.Instance.LoadSceneAsync("Scenes/Level 01"));
     }
 
     bool CheckError()
