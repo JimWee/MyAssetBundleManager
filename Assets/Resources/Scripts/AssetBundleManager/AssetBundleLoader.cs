@@ -28,6 +28,7 @@ namespace AssetBundles
     {
 
         public static AssetBundleLoader Instance = null;
+        public static AsyncOperation LoadSceneAsyncOpe = null;
         AssetBundleManifest mAssetBundleManifest = null;
         Dictionary<string, LoadedAssetBundle> mLoadedAssetBundles = new Dictionary<string, LoadedAssetBundle>();
         Dictionary<string, AssetBundleInfo> mAssetBundleInfos = new Dictionary<string, AssetBundleInfo>();
@@ -35,6 +36,7 @@ namespace AssetBundles
         void Awake()
         {
             Instance = this;
+            DontDestroyOnLoad(gameObject);
         }
 
         public string AssetBundleName2FilePath(string assetBundleName)
@@ -55,6 +57,14 @@ namespace AssetBundles
                 yield break;
             }
 #endif
+            if (mAssetBundleManifest != null)
+            {
+                Resources.UnloadAsset(mAssetBundleManifest);
+                mAssetBundleManifest = null;
+            }
+            LoadSceneAsyncOpe = null;
+            mAssetBundleInfos = null;
+            UnloadAllAssetBundles(true);
 
             //解析version文件
             string error = "";
@@ -109,6 +119,7 @@ namespace AssetBundles
                 Debug.LogErrorFormat("Load Asset Failed: {0}", assetName);
                 yield break;
             }
+            bundle.Unload(false);
             onLoadAssetFinished(assetRequest.asset);
         }
 
@@ -159,7 +170,9 @@ namespace AssetBundles
 #endif
 
             yield return StartCoroutine(LoadAssetBundleWithDependenciesAsync(scenePath + AssetBundleUtility.AssetBundleExtension));
-            yield return SceneManager.LoadSceneAsync(Path.GetFileName(scenePath), mode);
+            LoadSceneAsyncOpe = SceneManager.LoadSceneAsync(Path.GetFileName(scenePath), mode);
+            yield return LoadSceneAsyncOpe;
+            LoadSceneAsyncOpe = null;
         }
 
         public AssetBundle LoadAssetBundleWithDependencies(string assetBundleName)
@@ -262,7 +275,7 @@ namespace AssetBundles
 
         public void UnloadAsset(string assetPath)
         {
-            assetPath = assetPath.ToLower();
+            assetPath = assetPath.ToLower() + AssetBundleUtility.AssetBundleExtension;
 
             UnloadAssetBundle(assetPath);
 
@@ -286,6 +299,17 @@ namespace AssetBundles
                     mLoadedAssetBundles.Remove(assetBundleName);
                 }
             }
+        }
+
+        public void UnloadAllAssetBundles(bool unloadAllLoadedObjects)
+        {
+            foreach (var item in mLoadedAssetBundles)
+            {
+                item.Value.mAssetBundle.Unload(unloadAllLoadedObjects);
+            }
+            mLoadedAssetBundles.Clear();
+            Resources.UnloadUnusedAssets();
+            System.GC.Collect();
         }
     }
 }

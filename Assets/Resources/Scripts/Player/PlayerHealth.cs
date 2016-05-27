@@ -2,7 +2,7 @@
 using UnityEngine.UI;
 using System.Collections;
 using UnityEngine.SceneManagement;
-
+using AssetBundles;
 
 public class PlayerHealth : MonoBehaviour
 {
@@ -82,6 +82,7 @@ public class PlayerHealth : MonoBehaviour
 
     public void RestartLevel ()
     {
+        AssetBundleLoader.Instance.UnloadScene("Scenes/Level 01");
         SceneManager.LoadScene (0);
     }
 }

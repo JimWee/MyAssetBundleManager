@@ -32,15 +32,9 @@ public class UpdateManager : MonoBehaviour
     bool mIsDecompressing = false;
     int mZipFileNumber = 0;
     int[] mDecompressProgress = new int[1];
-    AsyncOperation mLoadSceneAsyncOpe;
+    bool mIsLoadingScene = false;
 
     delegate void ConfirmDelegate(bool isOk);
-
-    enum MyEnum
-    {
-        A = 0,
-        B = 1,
-    }
 
     /// <summary>
     /// 检查LocalAssetBundlePath路径下是否有VersionFileName文件
@@ -52,17 +46,19 @@ public class UpdateManager : MonoBehaviour
     /// <returns></returns>
     IEnumerator Start()
     {
-#if UNITY_EDITOR
-        if (AssetBundleUtility.SimulateAssetBundleInEditor)
-        {
-            yield break;
-        }
-#endif
-
         mBottomMsgTextCpt = UIBottomMsg.GetComponent<Text>();
         mProgressBarTextCpt = UIProgressBar.transform.Find("Text").GetComponent<Text>();
         mProgressBarSliderCpt = UIProgressBar.GetComponent<Slider>();
         UIStartGameBtn.SetActive(false);
+
+#if UNITY_EDITOR
+        if (AssetBundleUtility.SimulateAssetBundleInEditor)
+        {
+            yield return StartCoroutine(InitResources());
+            UIStartGameBtn.SetActive(true);
+            yield break;
+        }
+#endif
 
         AssetBundleUpdate.Init(URL);
 
@@ -298,12 +294,21 @@ public class UpdateManager : MonoBehaviour
             yield break;
         }
 
+        yield return StartCoroutine(InitResources());
+        UIStartGameBtn.SetActive(true);
+    }
+
+    IEnumerator InitResources()
+    {
         //加载AssetBundleLoader
         SetBottomMsg("初始化资源");
+        if (AssetBundleLoader.Instance == null)
+        {
+            GameObject abLoaderObj = new GameObject("AssetBundleLoader", typeof(AssetBundleLoader));
+            DontDestroyOnLoad(abLoaderObj);
+        }
         yield return StartCoroutine(AssetBundleLoader.Instance.Init());
-        SetBottomMsg("初始化资源完成");
-
-        UIStartGameBtn.SetActive(true);
+        SetBottomMsg("初始化资源完成");       
     }
 
     // Update is called once per frame
@@ -320,6 +325,14 @@ public class UpdateManager : MonoBehaviour
         else if (mIsDecompressing)
         {
             UpdateProgress(mDecompressProgress[0] / (float)mZipFileNumber);
+        }
+        else if (mIsLoadingScene)
+        {
+            if (AssetBundleLoader.LoadSceneAsyncOpe != null)
+            {
+                UpdateProgress(AssetBundleLoader.LoadSceneAsyncOpe.progress);
+                mIsLoadingScene = !AssetBundleLoader.LoadSceneAsyncOpe.isDone;
+            }
         }
         else
         {
@@ -393,6 +406,9 @@ public class UpdateManager : MonoBehaviour
     public void StartGame()
     {
         StartCoroutine(AssetBundleLoader.Instance.LoadSceneAsync("Scenes/Level 01"));
+        SetBottomMsg("加载场景中...");
+        UpdateProgress(0.0f);
+        mIsLoadingScene = true;
     }
 
     bool CheckError()

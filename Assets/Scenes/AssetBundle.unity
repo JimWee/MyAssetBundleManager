@@ -2741,8 +2741,6 @@ GameObject:
   serializedVersion: 4
   m_Component:
   - 4: {fileID: 2146590308}
-  - 114: {fileID: 2146590309}
-  - 114: {fileID: 2146590310}
   - 114: {fileID: 2146590307}
   m_Layer: 0
   m_Name: GameManager
@@ -2780,29 +2778,3 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 2
---- !u!114 &2146590309
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_PrefabParentObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 0}
-  m_GameObject: {fileID: 2146590306}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7ad39ec58bc8b2b449cc7a31a873aed0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &2146590310
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_PrefabParentObject: {fileID: 0}
-  m_PrefabInternal: {fileID: 0}
-  m_GameObject: {fileID: 2146590306}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 897d5d21ad1c0d741a20cb73e67ff436, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  Url: http://dlsw.baidu.com/sw-search-sp/soft/87/11993/
-  FileName: TortoiseSVN_1.9.3.27038_win32.1454137896.msi
-  UIBottomMsg: {fileID: 1171093267}
-  UIProgress: {fileID: 997883790}
