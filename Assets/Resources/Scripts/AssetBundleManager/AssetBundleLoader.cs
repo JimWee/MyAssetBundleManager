@@ -26,7 +26,11 @@ namespace AssetBundles
 
     public class AssetBundleLoader : MonoBehaviour
     {
-
+        public static bool TestUsedResourcesLoad = false;
+        public static bool TestResourcesLoad = false;
+        public static bool TestUsedLoad = false;
+        public static bool TestPreLoad = false;
+        public static bool TestUnload = true;
         public static AssetBundleLoader Instance = null;
         public static AsyncOperation LoadSceneAsyncOpe = null;
         AssetBundleManifest mAssetBundleManifest = null;

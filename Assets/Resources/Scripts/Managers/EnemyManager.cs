@@ -13,6 +13,27 @@ public class EnemyManager : MonoBehaviour
 
     void Start ()
     {
+        if (AssetBundleLoader.TestUsedResourcesLoad)
+        {
+            GameObject obj = Resources.Load(enemyPath) as GameObject;
+        }
+
+        if (AssetBundleLoader.TestPreLoad)
+        {
+            enemy = AssetBundleLoader.Instance.LoadAsset(enemyPath) as GameObject;
+            if (AssetBundleLoader.TestUnload)
+            {
+                AssetBundleLoader.Instance.UnloadAsset(enemyPath);
+            }
+        }
+        if (AssetBundleLoader.TestUsedLoad)
+        {
+            GameObject obj = AssetBundleLoader.Instance.LoadAsset(enemyPath) as GameObject;
+            if (AssetBundleLoader.TestUnload)
+            {
+                AssetBundleLoader.Instance.UnloadAsset(enemyPath);
+            }
+        }
         InvokeRepeating ("Spawn", spawnTime, spawnTime);
     }
 
@@ -26,9 +47,23 @@ public class EnemyManager : MonoBehaviour
 
         int spawnPointIndex = Random.Range (0, spawnPoints.Length);
 
-        if (enemy == null)
+        if (AssetBundleLoader.TestResourcesLoad)
         {
-            enemy = AssetBundleLoader.Instance.LoadAsset(enemyPath) as GameObject;
+            if (enemy == null)
+            {
+                enemy = Resources.Load(enemyPath) as GameObject;
+            }
+        }
+        else
+        {
+            if (enemy == null && !AssetBundleLoader.TestPreLoad)
+            {
+                enemy = AssetBundleLoader.Instance.LoadAsset(enemyPath) as GameObject;
+                if (AssetBundleLoader.TestUnload)
+                {
+                    AssetBundleLoader.Instance.UnloadAsset(enemyPath);
+                }
+            }
         }
 
         Instantiate (enemy, spawnPoints[spawnPointIndex].position, spawnPoints[spawnPointIndex].rotation);

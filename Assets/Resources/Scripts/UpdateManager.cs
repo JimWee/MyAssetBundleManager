@@ -435,4 +435,32 @@ public class UpdateManager : MonoBehaviour
         mFileName = fileName;
         mError = error;
     }
+
+    public void SetTestPreLoad(bool preLoad)
+    {
+        AssetBundleLoader.TestPreLoad = preLoad;
+        Debug.LogFormat("PreLoad: {0}", AssetBundleLoader.TestPreLoad);
+    }
+
+    public void SetTestUnload(bool unLoad)
+    {
+        AssetBundleLoader.TestUnload = unLoad;
+        Debug.LogFormat("Unload: {0}", AssetBundleLoader.TestUnload);
+    }
+
+    public void SetTestUsedLoad(bool usedLoad)
+    {
+        AssetBundleLoader.TestUsedLoad = usedLoad;
+        Debug.LogFormat("UsedLoad: {0}", AssetBundleLoader.TestUsedLoad);
+    }
+
+    public void SetResourcesLoad(bool resourcesLoad)
+    {
+        AssetBundleLoader.TestResourcesLoad = resourcesLoad;
+    }
+
+    public void SetUsedResourcesLoad(bool usedResourcesLoad)
+    {
+        AssetBundleLoader.TestUsedResourcesLoad = usedResourcesLoad;
+    }
 }
