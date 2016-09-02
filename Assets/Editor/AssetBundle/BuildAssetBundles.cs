@@ -17,7 +17,7 @@ namespace AssetBundles
         public const int LevelOfCompression = 9; //(0-10)
 
         const string kSimulationMode = "AssetBundles/Simulation Mode";
-        [MenuItem(kSimulationMode)]
+        [MenuItem(kSimulationMode, false, 1)]
         public static void ToggleSimulationMode()
         {
             AssetBundleUtility.SimulateAssetBundleInEditor = !AssetBundleUtility.SimulateAssetBundleInEditor;
@@ -30,18 +30,18 @@ namespace AssetBundles
             return true;
         }
 
-        [MenuItem("AssetBundles/Build Test")]
-        static public void Test()
-        {
-            string outputPath = Path.Combine(AssetBundlesOutputPath, AssetBundleUtility.GetPlatformName());
-            if (!Directory.Exists(outputPath))
-            {
-                Directory.CreateDirectory(outputPath);
-            }
-            BuildPipeline.BuildAssetBundles(outputPath, BuildAssetBundleOptions.None, EditorUserBuildSettings.activeBuildTarget);
-        }
+        //[MenuItem("AssetBundles/Build Test")]
+        //static public void Test()
+        //{
+        //    string outputPath = Path.Combine(AssetBundlesOutputPath, AssetBundleUtility.GetPlatformName());
+        //    if (!Directory.Exists(outputPath))
+        //    {
+        //        Directory.CreateDirectory(outputPath);
+        //    }
+        //    BuildPipeline.BuildAssetBundles(outputPath, BuildAssetBundleOptions.DisableWriteTypeTree | BuildAssetBundleOptions.ChunkBasedCompression, EditorUserBuildSettings.activeBuildTarget);
+        //}
 
-        [MenuItem("AssetBundles/Build AssetBundles")]
+        [MenuItem("AssetBundles/Build AssetBundles", false, 100)]
         static public void Build()
         {
             string outputPath = Path.Combine(AssetBundlesOutputPath, AssetBundleUtility.GetPlatformName());
@@ -49,7 +49,10 @@ namespace AssetBundles
             {
                 Directory.CreateDirectory(outputPath);
             }
-                
+
+            //List<KeyValuePair<string, string>> assetInfos = new List<KeyValuePair<string, string>>();
+            //assetInfos.Add(new KeyValuePair<string, string>(AssetBundleUtility.GetPlatformName(), AssetBundleUtility.GetPlatformName() + AssetBundleUtility.AssetBundleExtension));
+
             List<string> paths = new List<string>();
             paths.Add(AssetBundleUtility.GetPlatformName() + AssetBundleUtility.AssetBundleExtension);
 
@@ -80,6 +83,14 @@ namespace AssetBundles
             {
                 if (Path.GetExtension(item.Name) != ".meta")
                 {
+                    //AssetImporter ai = AssetImporter.GetAtPath(item.FullName);
+                    //if (string.IsNullOrEmpty(ai.assetBundleName))
+                    //{
+                    //    ai.assetBundleName = FilePathToAssetBundleName(item.FullName).ToLower();
+                    //}
+                    //else
+                    //{
+                    //}
                     string assetBundleName = FilePathToAssetBundleName(item.FullName).ToLower() + AssetBundleUtility.AssetBundleExtension;
                     paths.Add(assetBundleName);
 
@@ -134,7 +145,7 @@ namespace AssetBundles
             return filePath.Replace(Directory.GetCurrentDirectory() + "\\", "").Replace("\\", "/");
         }
 
-        [MenuItem("AssetBundles/Update Resources Files")]
+        [MenuItem("AssetBundles/Update Resources Files", false, 101)]
         static public void UpdateResourcesFiles()
         {
             string patchesOutputPathPlatform = Path.Combine(PatchesOutputPath, AssetBundleUtility.GetPlatformName());
@@ -267,7 +278,7 @@ namespace AssetBundles
             }
         }
 
-        [MenuItem("AssetBundles/Build Resources Zip")]
+        [MenuItem("AssetBundles/Build Resources Zip", false, 103)]
         static void BuildResourcesZip()
         {
             string outputPath = Path.Combine(PatchesOutputPath, AssetBundleUtility.GetPlatformName());
@@ -307,7 +318,7 @@ namespace AssetBundles
         }
 
 
-        [MenuItem("AssetBundles/AssetBundle Folder/Open Local Patches Folder")]
+        [MenuItem("AssetBundles/AssetBundle Folder/Open Local Patches Folder", false, 200)]
         static void OpenLocalPatchesFolder()
         {
             string path = Path.GetFullPath(AssetBundleUtility.LocalAssetBundlePath);
@@ -322,7 +333,7 @@ namespace AssetBundles
             
         }
 
-        [MenuItem("AssetBundles/AssetBundle Folder/Open Output AssetBundle Folder")]
+        [MenuItem("AssetBundles/AssetBundle Folder/Open Output AssetBundle Folder", false, 201)]
         static void OpenOutputAssetBundleFolder()
         {
             string path = Path.GetFullPath(AssetBundlesOutputPath);
@@ -337,7 +348,7 @@ namespace AssetBundles
             
         }
 
-        [MenuItem("AssetBundles/AssetBundle Folder/Open Output Patches Folder")]
+        [MenuItem("AssetBundles/AssetBundle Folder/Open Output Patches Folder", false, 202)]
         static void OpenOutputPatchesFolder()
         {
             string path = Path.GetFullPath(PatchesOutputPath);
@@ -352,7 +363,7 @@ namespace AssetBundles
 
         }
 
-        [MenuItem("AssetBundles/AssetBundle Folder/Clear Local Patches Folder")]
+        [MenuItem("AssetBundles/AssetBundle Folder/Clear Local Patches Folder", false, 220)]
         static void ClearLocalPatchesFolder()
         {
             if (Directory.Exists(AssetBundleUtility.LocalAssetBundlePath))
@@ -362,7 +373,7 @@ namespace AssetBundles
             EditorUtility.DisplayDialog("Clear Local AssetBundle Folder", "Clear Success", "OK");
         }
 
-        [MenuItem("AssetBundles/AssetBundle Folder/Clear Output AssetBundle Folder")]
+        [MenuItem("AssetBundles/AssetBundle Folder/Clear Output AssetBundle Folder", false, 221)]
         static void ClearOutputAssetBundleFolder()
         {
             if (Directory.Exists(AssetBundlesOutputPath))

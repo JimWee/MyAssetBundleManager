@@ -11,6 +11,7 @@ using UnityEngine.Experimental.Networking;
 public class UpdateManager : MonoBehaviour
 {
     public string URL;
+    public GameObject UIRoot;
     public GameObject UIPopMsg;
     public GameObject UIProgressBar;
     public GameObject UIBottomMsg;
@@ -401,6 +402,14 @@ public class UpdateManager : MonoBehaviour
     public void LoadSceneAsync()
     {
         StartCoroutine(AssetBundleLoader.Instance.LoadSceneAsync("Scenes/Scene2"));
+    }
+
+    public void LoadUI()
+    {
+        GameObject ui = Instantiate(AssetBundleLoader.Instance.LoadAsset("Prefabs/UI/Dlg_Settings")) as GameObject;
+        //GameObject ui = Resources.Load("Prefabs/Scroll View") as GameObject;
+        ui.transform.SetParent(UIRoot.transform, false);
+        ui.SetActive(false);
     }
 
     public void StartGame()
